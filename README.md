@@ -1,4 +1,6 @@
-AsyncIO
-=======
+# AsyncIO
 
-Delphi.AsyncIO library
+Delphi.AsyncIO library, inspired by Boost.ASIO.
+
+Under development!
+
