@@ -2,5 +2,5 @@
 
 Delphi.AsyncIO library, inspired by Boost.ASIO.
 
-Under development!
+Under development! Currently mostly for fun.
 
