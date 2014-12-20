@@ -1,3 +1,17 @@
+//   Copyright 2014 Asbjørn Heid
+//
+//   Licensed under the Apache License, Version 2.0 (the "License");
+//   you may not use this file except in compliance with the License.
+//   You may obtain a copy of the License at
+//
+//       http://www.apache.org/licenses/LICENSE-2.0
+//
+//   Unless required by applicable law or agreed to in writing, software
+//   distributed under the License is distributed on an "AS IS" BASIS,
+//   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//   See the License for the specific language governing permissions and
+//   limitations under the License.
+
 unit AsyncIO.ErrorCodes;
 
 interface
@@ -29,10 +43,25 @@ type
     class operator LogicalAnd(const Other: boolean; const ec: IOErrorCode): boolean;
   end;
 
+
+type
+  WinsockResult = record
+    Value: integer;
+
+    class operator Implicit(const Value: integer): WinsockResult;
+  end;
+
+type
+  GetAddrResult = record
+    Value: integer;
+
+    class operator Implicit(const Value: integer): GetAddrResult;
+  end;
+
 implementation
 
 uses
-  System.SysUtils;
+  System.SysUtils, IdWinsock2;
 
 { IOErrorCode }
 
@@ -96,6 +125,26 @@ end;
 class function IOErrorCode.Success: IOErrorCode;
 begin
   result := IOErrorCode.Create(ERROR_SUCCESS);
+end;
+
+{ WinsockResult }
+
+class operator WinsockResult.Implicit(const Value: integer): WinsockResult;
+begin
+  if (Value = SOCKET_ERROR) then
+    RaiseLastOSError(WSAGetLastError);
+
+  result.Value := Value;
+end;
+
+{ GetAddrResult }
+
+class operator GetAddrResult.Implicit(const Value: integer): GetAddrResult;
+begin
+  if (Value <> 0) then
+    RaiseLastOSError(WSAGetLastError);
+
+  result.Value := Value;
 end;
 
 end.
