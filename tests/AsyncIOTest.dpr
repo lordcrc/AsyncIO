@@ -10,7 +10,8 @@ uses
   AsyncIO in '..\src\AsyncIO.pas',
   AsyncIO.Test.Basic in 'AsyncIO.Test.Basic.pas',
   AsyncIO.Test.Copy in 'AsyncIO.Test.Copy.pas',
-  AsyncIO.Net.IP in '..\src\AsyncIO.Net.IP.pas';
+  AsyncIO.Net.IP in '..\src\AsyncIO.Net.IP.pas',
+  AsyncIO.Test.Socket in 'AsyncIO.Test.Socket.pas';
 
 begin
   ReportMemoryLeaksOnShutdown := True;

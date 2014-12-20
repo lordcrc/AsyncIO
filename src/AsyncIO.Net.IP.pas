@@ -34,6 +34,7 @@ type
   IPv6Address = record
   public
     type IPv6AddressBytes = array[0..15] of UInt8;
+    type PIPv6AddressBytes = ^IPv6AddressBytes;
   strict private
     FAddress: array[0..15] of UInt8;
     FScopeId: UInt32;
@@ -117,6 +118,8 @@ type
   private
     class function Create(const Family: IPAddressFamily; const Port: UInt16): IPEndpoint; overload; static;
     class function Create(const Address: IPAddress; const Port: UInt16): IPEndpoint; overload; static;
+    class function Create(const SocketAddress4: PSockAddrIn; const AddressLength: NativeUInt): IPEndpoint; overload; static;
+    class function Create(const SocketAddress6: PSockAddrIn6; const AddressLength: NativeUInt): IPEndpoint; overload; static;
   public
     class operator Implicit(const Endpoint: IPEndpoint): string;
 
@@ -132,16 +135,53 @@ type
       2: (Fv6: SOCKADDR_IN6_W2KSP1);
   end;
 
+function Endpoint(): IPEndpoint; overload; inline;
+function Endpoint(const Family: IPAddressFamily; PortNumber: UInt16): IPEndpoint; overload; inline;
+function Endpoint(const Address: IPAddress; const PortNumber: UInt16): IPEndpoint; overload; inline;
 
-  ResolverQueryFlag = (
-    ResolverQueryPassive,
-    ResolverQueryCannonicalName,
-    ResolverQueryNumericHost,
-    ResolverQueryNumericService,
-    ResolverQueryAllMatching,
-    ResolverQueryV4Mapped,
-    ResolverQueryAddressConfigured);
-  ResolverQueryFlags = set of ResolverQueryFlag;
+type
+  IPProtocol = record
+  strict private
+    FFamily: integer;
+    FSocketType: integer;
+    FProtocol: integer;
+  public
+    type
+      ICMPProtocol = record
+        class function v4: IPProtocol; static;
+        class function v6: IPProtocol; static;
+        class function Unspecified: IPProtocol; static;
+      end;
+      TCPProtocol = record
+        class function v4: IPProtocol; static;
+        class function v6: IPProtocol; static;
+        class function Unspecified: IPProtocol; static;
+      end;
+      UDPProtocol = record
+        class function v4: IPProtocol; static;
+        class function v6: IPProtocol; static;
+        class function Unspecified: IPProtocol; static;
+      end;
+  public
+    class function ICMP: ICMPProtocol; static;
+    class function TCP: TCPProtocol; static;
+    class function UDP: UDPProtocol; static;
+    class function Unspecified: IPProtocol; static;
+
+    property Family: integer read FFamily;
+    property SocketType: integer read FSocketType;
+    property Protocol: integer read FProtocol;
+  end;
+
+  ResolveFlag = (
+    ResolvePassive,
+    ResolveCannonicalName,
+    ResolveNumericHost,
+    ResolveNumericService,
+    ResolveAllMatching,
+    ResolveV4Mapped,
+    ResolveAddressConfigured);
+  ResolveFlags = set of ResolveFlag;
 
   ResolverEntry = record
   strict private
@@ -153,23 +193,74 @@ type
     property ServiceName: string read FServicename;
   end;
 
-  Resolver = record
+type
+  IPResolver = record
+  public
+    type
+      TAddressInfo = ADDRINFOEXW;
+      PAddressInfo = ^ADDRINFOEXW;
+      Query = record
+      strict private
+        FHints: TAddressInfo;
+        FHostName: string;
+        FServiceName: string;
 
+        function GetHints: PAddressInfo;
+      private
+        class function Create(const Protocol: IPProtocol; const Host, Service: string; const Flags: ResolveFlags): IPResolver.Query; static;
+
+        property Hints: PAddressInfo read GetHints;
+      public
+        property HostName: string read FHostName;
+        property ServiceName: string read FServiceName;
+      end;
+      Entry = record
+      strict private
+        FEndpoint: IPEndpoint;
+        FHostName: string;
+        FServiceName: string;
+      private
+        class function Create(const Endpoint: IPEndpoint; const Host, Service: string): Entry; static;
+      public
+        property Endpoint: IPEndpoint read FEndpoint;
+        property HostName: string read FHostName;
+        property ServiceName: string read FServiceName;
+      end;
+      Results = record
+      public
+        type
+          TResultsEnumerator = class
+          strict private
+            FResults: TArray<Entry>;
+            FIndex: integer;
+          private
+            function GetCurrent: Entry;
+          public
+            constructor Create(const Results: TArray<Entry>);
+
+            function MoveNext: boolean;
+
+            property Current: Entry read GetCurrent;
+          end;
+      strict private
+        FResults: TArray<Entry>;
+      private
+        class function Create(const Host, Service: string; const AddressInfo: PAddressInfo): Results; static;
+      public
+        function GetEnumerator: TResultsEnumerator;
+     end;
+  public
+    class function Resolve(const ResolveQuery: Query): Results; static;
   end;
 
-  ResolverQuery = record
-
-  end;
-
-function Endpoint(): IPEndpoint; overload; inline;
-function Endpoint(const Family: IPAddressFamily; PortNumber: UInt16): IPEndpoint; overload; inline;
-function Endpoint(const Address: IPAddress; const PortNumber: UInt16): IPEndpoint; overload; inline;
+function Query(const Protocol: IPProtocol; const Host, Service: string; const Flags: ResolveFlags = [ResolveAddressConfigured]): IPResolver.Query; inline; overload;
+function Query(const Host, Service: string; const Flags: ResolveFlags = [ResolveAddressConfigured]): IPResolver.Query; inline; overload;
 
 implementation
 
 uses
   System.RegularExpressions, AsyncIO.ErrorCodes, IdWship6,
-  System.SysUtils;
+  System.SysUtils, System.Math, Winapi.Windows;
 
 { IPv4Address }
 
@@ -563,6 +654,27 @@ begin
   result.Port := Port;
 end;
 
+class function IPEndpoint.Create(const SocketAddress4: PSockAddrIn;
+  const AddressLength: NativeUInt): IPEndpoint;
+begin
+  if (AddressLength < SizeOf(result.Fv4)) then
+    raise EArgumentException.Create('Unknown socket address type');
+
+  Move(SocketAddress4^, result.Fv4, SizeOf(result.Fv4));
+end;
+
+class function IPEndpoint.Create(const SocketAddress6: PSockAddrIn6;
+  const AddressLength: NativeUInt): IPEndpoint;
+begin
+  if (AddressLength < SizeOf(TSockAddrIn6)) then
+    raise EArgumentException.Create('Unknown socket address type');
+
+  if (AddressLength < SizeOf(result.Fv6)) then
+    FillChar(result.Fv6, SizeOf(result.Fv6), 0);
+
+  Move(SocketAddress6^, result.Fv6, Min(AddressLength, SizeOf(result.Fv6)));
+end;
+
 function IPEndpoint.GetAddress: IPAddress;
 var
   bytesV6: IPv6Address.IPv6AddressBytes;
@@ -613,7 +725,7 @@ end;
 procedure IPEndpoint.SetAddress(const Value: IPAddress);
 var
   addrV6: IPv6Address;
-  bytesV6: IPv6Address.IPv6AddressBytes;
+  bytesV6: IPv6Address.PIPv6AddressBytes;
 begin
   if (Value.IsIPv4) then
   begin
@@ -623,12 +735,14 @@ begin
   end
   else //if (Value.IsIPv6) then
   begin
+    addrV6 := Value.AsIPv6;
+
     Fv6.sin6_family := IPAddressFamily.v6;
     Fv6.sin6_port := 0;
     Fv6.sin6_flowinfo := 0;
-    addrV6 := Value.AsIPv6;
-    bytesV6 := addrV6.Data;
-    Move(bytesV6[0], Fv6.sin6_addr.s6_bytes[0], 16);
+
+    bytesV6 := @Fv6.sin6_addr.s6_bytes;
+    bytesV6^ := addrV6.Data;
     Fv6.sin6_scope_id := addrV6.ScopeId;
   end;
 end;
@@ -640,6 +754,268 @@ begin
     Fv4.sin_port := htons(Value)
   else //if (IsIPv6) then
     Fv6.sin6_port := htons(Value);
+end;
+
+{ IPProtocol }
+
+class function IPProtocol.ICMP: ICMPProtocol;
+begin
+  // just a helper
+end;
+
+class function IPProtocol.TCP: TCPProtocol;
+begin
+  // just a helper
+end;
+
+class function IPProtocol.UDP: UDPProtocol;
+begin
+  // just a helper
+end;
+
+class function IPProtocol.Unspecified: IPProtocol;
+begin
+  result.FFamily := AF_UNSPEC;
+  result.FSocketType := 0;
+  result.FProtocol := IPPROTO_IP;
+end;
+
+{ IPProtocol.ICMPProtocol }
+
+class function IPProtocol.ICMPProtocol.Unspecified: IPProtocol;
+begin
+  result.FFamily := AF_UNSPEC;
+  result.FSocketType := SOCK_RAW;
+  result.FProtocol := IPPROTO_ICMP;
+end;
+
+class function IPProtocol.ICMPProtocol.v4: IPProtocol;
+begin
+  result.FFamily := AF_INET;
+  result.FSocketType := SOCK_RAW;
+  result.FProtocol := IPPROTO_ICMP;
+end;
+
+class function IPProtocol.ICMPProtocol.v6: IPProtocol;
+begin
+  result.FFamily := AF_INET6;
+  result.FSocketType := SOCK_RAW;
+  result.FProtocol := IPPROTO_ICMP;
+end;
+
+{ IPProtocol.TCPProtocol }
+
+class function IPProtocol.TCPProtocol.Unspecified: IPProtocol;
+begin
+  result.FFamily := AF_UNSPEC;
+  result.FSocketType := SOCK_STREAM;
+  result.FProtocol := IPPROTO_TCP;
+end;
+
+class function IPProtocol.TCPProtocol.v4: IPProtocol;
+begin
+  result.FFamily := AF_INET;
+  result.FSocketType := SOCK_STREAM;
+  result.FProtocol := IPPROTO_TCP;
+end;
+
+class function IPProtocol.TCPProtocol.v6: IPProtocol;
+begin
+  result.FFamily := AF_INET6;
+  result.FSocketType := SOCK_STREAM;
+  result.FProtocol := IPPROTO_TCP;
+end;
+
+{ IPProtocol.UDPProtocol }
+
+class function IPProtocol.UDPProtocol.Unspecified: IPProtocol;
+begin
+  result.FFamily := AF_UNSPEC;
+  result.FSocketType := SOCK_DGRAM;
+  result.FProtocol := IPPROTO_UDP;
+end;
+
+class function IPProtocol.UDPProtocol.v4: IPProtocol;
+begin
+  result.FFamily := AF_INET;
+  result.FSocketType := SOCK_DGRAM;
+  result.FProtocol := IPPROTO_UDP;
+end;
+
+class function IPProtocol.UDPProtocol.v6: IPProtocol;
+begin
+  result.FFamily := AF_INET6;
+  result.FSocketType := SOCK_DGRAM;
+  result.FProtocol := IPPROTO_UDP;
+end;
+
+function Query(const Protocol: IPProtocol; const Host, Service: string; const Flags: ResolveFlags): IPResolver.Query;
+begin
+  result := IPResolver.Query.Create(Protocol, Host, Service, Flags);
+end;
+
+function Query(const Host, Service: string; const Flags: ResolveFlags = [ResolveAddressConfigured]): IPResolver.Query; inline;
+begin
+  result := IPResolver.Query.Create(IPProtocol.Unspecified, Host, Service, Flags);
+end;
+
+function ResolveFlagsToAIFlags(const Flags: ResolveFlags): integer;
+begin
+  result := 0;
+  if (ResolvePassive in Flags) then
+    result := result or AI_PASSIVE;
+  if (ResolveCannonicalName in Flags) then
+    result := result or AI_CANONNAME;
+  if (ResolveNumericHost in Flags) then
+    result := result or AI_NUMERICHOST;
+  if (ResolveNumericService in Flags) then
+    result := result or AI_NUMERICSERV;
+  if (ResolveAllMatching in Flags) then
+    result := result or AI_ALL;
+  if (ResolveV4Mapped in Flags) then
+    result := result or AI_V4MAPPED;
+  if (ResolveAddressConfigured in Flags) then
+    result := result or AI_ADDRCONFIG;
+end;
+
+{ IPResolver.Query }
+
+class function IPResolver.Query.Create(const Protocol: IPProtocol; const Host,
+  Service: string; const Flags: ResolveFlags): IPResolver.Query;
+begin
+  result.FHostName := Host;
+  result.FServiceName := Service;
+  FillChar(result.FHints, SizeOf(result.FHints), 0);
+  result.FHints.ai_flags := ResolveFlagsToAIFlags(Flags);
+  result.FHints.ai_family := Protocol.Family;
+  result.FHints.ai_socktype := Protocol.SocketType;
+  result.FHints.ai_protocol := Protocol.Protocol;
+end;
+
+function IPResolver.Query.GetHints: PAddressInfo;
+begin
+  result := @FHints;
+end;
+
+{ IPResolver.Entry }
+
+class function IPResolver.Entry.Create(const Endpoint: IPEndpoint; const Host,
+  Service: string): Entry;
+begin
+  result.FEndpoint := Endpoint;
+  result.FHostname := Host;
+  result.FServiceName := Service;
+end;
+
+{ IPResolver.Results.TResultsEnumerator }
+
+constructor IPResolver.Results.TResultsEnumerator.Create(
+  const Results: TArray<Entry>);
+begin
+  inherited Create;
+
+  FResults := Results;
+  FIndex := -1;
+end;
+
+function IPResolver.Results.TResultsEnumerator.GetCurrent: Entry;
+begin
+  result := FResults[FIndex];
+end;
+
+function IPResolver.Results.TResultsEnumerator.MoveNext: boolean;
+var
+  i: integer;
+begin
+  i := FIndex + 1;
+  result := (i < Length(FResults));
+  if not result then
+    exit;
+  FIndex := i;
+end;
+
+{ IPResolver.Results }
+
+class function IPResolver.Results.Create(
+  const Host, Service: string;
+  const AddressInfo: PAddressInfo): Results;
+var
+  addr: PAddressInfo;
+  i: integer;
+begin
+  // lets count
+  i := 0;
+  addr := AddressInfo;
+  while (addr <> nil) do
+  begin
+    i := i + 1;
+    addr := PAddressInfo(addr.ai_next);
+  end;
+
+  SetLength(result.FResults, i);
+
+  if (i <= 0) then
+    exit;
+
+  // this time for reals
+  i := 0;
+  addr := AddressInfo;
+  while (addr <> nil) do
+  begin
+    if (addr^.ai_family = AF_INET) then
+    begin
+      result.FResults[i] := Entry.Create(
+        IPEndpoint.Create(PSockAddrIn(addr^.ai_addr), addr^.ai_addrlen),
+        Host, Service);
+      i := i + 1;
+    end
+    else if (addr^.ai_family = AF_INET6) then
+    begin
+      result.FResults[i] := Entry.Create(
+        IPEndpoint.Create(PSockAddrIn6(addr^.ai_addr), addr^.ai_addrlen),
+        Host, Service);
+      i := i + 1;
+    end;
+    // ignore the others families
+
+    addr := PAddressInfo(addr.ai_next);
+  end;
+end;
+
+function IPResolver.Results.GetEnumerator: IPResolver.Results.TResultsEnumerator;
+begin
+  result := TResultsEnumerator.Create(FResults);
+end;
+
+{ IPResolver }
+
+class function IPResolver.Resolve(const ResolveQuery: Query): Results;
+type
+  // workaround for broken declaration
+  LPFN_GETADDRINFOEX = function(pName : PWideChar; pServiceName : PWideChar;
+    const dwNameSpace: UInt32; lpNspId : LPGUID; hints : PAddressInfo;
+    var ppResult : PAddressInfo; timeout : Ptimeval; lpOverlapped : LPWSAOVERLAPPED;
+    lpCompletionRoutine : LPLOOKUPSERVICE_COMPLETION_ROUTINE;
+    lpNameHandle : PHandle) : Integer; stdcall;
+var
+  res: GetAddrResult;
+  addr: PAddressInfo;
+begin
+  res := LPFN_GETADDRINFOEX(GetAddrInfoEx)(
+    PChar(ResolveQuery.HostName),
+    PChar(ResolveQuery.ServiceName),
+    NS_ALL,
+    nil,
+    ResolveQuery.Hints,
+    addr,
+    nil,
+    nil,
+    nil,
+    nil);
+
+  result := Results.Create(ResolveQuery.HostName, ResolveQuery.ServiceName, addr);
+
+  FreeAddrInfoEx(PADDRINFOEXA(addr));
 end;
 
 initialization

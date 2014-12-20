@@ -48,12 +48,26 @@ begin
   endp := Endpoint(IPAddress('192.168.42.1'), 9876);
   WriteLn('IPv4 connection endpoint: ' + endp);
 
+  endp := Endpoint(IPAddress('1234:abcd::1'), 0);
+  WriteLn('IPv6 connection endpoint: ' + endp);
+
   WriteLn;
 end;
 
 procedure TestResolve;
+var
+  qry: IPResolver.Query;
+  res: IPResolver.Results;
+  ip: IPResolver.Entry;
 begin
+  qry := Query(IPProtocol.TCPProtocol.Unspecified, 'google.com', '80', [ResolveAllMatching]);
+  res := IPResolver.Resolve(qry);
 
+  WriteLn('Resolved ' + qry.HostName + ':' + qry.ServiceName + ' as');
+  for ip in res do
+  begin
+    WriteLn('  ' + ip.Endpoint.Address);
+  end;
 end;
 
 procedure RunSocketTest;
