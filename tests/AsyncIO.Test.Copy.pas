@@ -7,7 +7,7 @@ procedure RunCopyTest;
 implementation
 
 uses
-  System.SysUtils, AsyncIO, AsyncIO.ErrorCodes;
+  System.SysUtils, System.DateUtils, AsyncIO, AsyncIO.ErrorCodes, System.Math;
 
 type
   FileCopier = class
@@ -17,6 +17,11 @@ type
     FOutputStream: AsyncFileStream;
     FTotalBytesRead: UInt64;
     FTotalBytesWritten: UInt64;
+    FReadTimestamp: TDateTime;
+    FWriteTimestamp: TDateTime;
+    FReadTimeMSec: Int64;
+    FWriteTimeMSec: Int64;
+    FPrintTimestamp: TDateTime;
     FDoneReading: boolean;
 
     procedure ReadHandler(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64);
@@ -76,6 +81,7 @@ begin
     procedure
     begin
       // queue read to start things
+      FReadTimestamp := Now;
       AsyncRead(FInputStream, FBuffer, TransferAll(), ReadHandler);
     end
   );
@@ -91,7 +97,13 @@ end;
 
 procedure FileCopier.PrintProgress;
 begin
-  Write(Format(#13'Read: %3d MB / Written: %3d MB       ', [FTotalBytesRead shr 20, FTotalBytesWritten shr 20]));
+  if (MilliSecondsBetween(Now, FPrintTimestamp) < 500) then
+    exit;
+
+  Write(Format(#13'Read: %3d MB (%.2f MB/s) | Written: %3d MB (%.2f MB/s)         ',
+    [FTotalBytesRead shr 20, IfThen(FReadTimeMSec > 0, (FTotalBytesRead / (1e3 * FReadTimeMSec))),
+     FTotalBytesWritten shr 20, IfThen(FWriteTimeMSec > 0, (FTotalBytesWritten / (1e3 * FWriteTimeMSec)))]));
+  FPrintTimestamp := Now;
 end;
 
 procedure FileCopier.ReadHandler(const ErrorCode: IOErrorCode;
@@ -106,12 +118,14 @@ begin
     FDoneReading := True;
 
   FTotalBytesRead := FTotalBytesRead + BytesTransferred;
+  FReadTimeMSec := FReadTimeMSec + MilliSecondsBetween(Now, FReadTimestamp);
   PrintProgress;
 
   if (BytesTransferred = 0) then
     exit;
 
   // reading done, queue write
+  FWriteTimestamp := Now;
   AsyncWrite(FOutputStream, FBuffer, TransferExactly(BytesTransferred), WriteHandler);
 end;
 
@@ -123,13 +137,18 @@ begin
     RaiseLastOSError(ErrorCode.Value, 'While writing file');
   end;
 
+  if (FDoneReading) then
+    FPrintTimestamp := 0;
+
   FTotalBytesWritten := FTotalBytesWritten + BytesTransferred;
+  FWriteTimeMSec := FWriteTimeMSec + MilliSecondsBetween(Now, FWriteTimestamp);
   PrintProgress;
 
   if (FDoneReading) then
     exit;
 
   // writing done and we got more to read, so queue read
+  FReadTimestamp := Now;
   AsyncRead(FInputStream, FBuffer, TransferAll(), ReadHandler);
 end;
 
