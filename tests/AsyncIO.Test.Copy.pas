@@ -101,8 +101,8 @@ begin
     exit;
 
   Write(Format(#13'Read: %3d MB (%.2f MB/s) | Written: %3d MB (%.2f MB/s)         ',
-    [FTotalBytesRead shr 20, IfThen(FReadTimeMSec > 0, (FTotalBytesRead / (1e3 * FReadTimeMSec))),
-     FTotalBytesWritten shr 20, IfThen(FWriteTimeMSec > 0, (FTotalBytesWritten / (1e3 * FWriteTimeMSec)))]));
+    [FTotalBytesRead shr 20, FTotalBytesRead / (1e3 * Max(1, FReadTimeMSec)),
+     FTotalBytesWritten shr 20, FTotalBytesWritten / (1e3 * Max(1, FWriteTimeMSec))]));
   FPrintTimestamp := Now;
 end;
 
