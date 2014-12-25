@@ -3,7 +3,7 @@ unit AsyncIO.Net.IP;
 interface
 
 uses
-  IdWinsock2;
+  IdWinsock2, AsyncIO;
 
 type
   IPv4Address = record
@@ -115,6 +115,8 @@ type
     procedure SetPort(const Value: UInt16);
     function GetIsIPv4: boolean;
     function GetIsIPv6: boolean;
+    function GetData: Pointer;
+    function GetDataLength: integer;
   private
     class function Create(const Family: IPAddressFamily; const Port: UInt16): IPEndpoint; overload; static;
     class function Create(const Address: IPAddress; const Port: UInt16): IPEndpoint; overload; static;
@@ -128,6 +130,9 @@ type
 
     property IsIPv4: boolean read GetIsIPv4;
     property IsIPv6: boolean read GetIsIPv6;
+
+    property Data: Pointer read GetData;
+    property DataLength: integer read GetDataLength;
   strict private
     case integer of
       0: (FBase: TSockAddrStorage);
@@ -256,11 +261,64 @@ type
 function Query(const Protocol: IPProtocol; const Host, Service: string; const Flags: ResolveFlags = [ResolveAddressConfigured]): IPResolver.Query; inline; overload;
 function Query(const Host, Service: string; const Flags: ResolveFlags = [ResolveAddressConfigured]): IPResolver.Query; inline; overload;
 
+
+type
+  SocketShutdownFlag = (
+    SocketShutdownRead,
+    SocketShutdownWrite,
+    SocketShutdownBoth
+  );
+
+  IPSocket = interface
+{$REGION 'Property accessors'}
+    function GetService: IOService;
+    function GetProtocol: IPProtocol;
+    function GetLocalEndpoint: IPEndpoint;
+    function GetRemoteEndpoint: IPEndpoint;
+    function GetSocketHandle: TSocket;
+{$ENDREGION}
+
+    procedure Connect(const PeerEndpoint: IPEndpoint);
+    procedure Close;
+
+    procedure Shutdown(const ShutdownFlag: SocketShutdownFlag = SocketShutdownBoth); overload;
+
+    property Service: IOService read GetService;
+    property Protocol: IPProtocol read GetProtocol;
+    property LocalEndpoint: IPEndpoint read GetLocalEndpoint;
+    property RemoteEndpoint: IPEndpoint read GetRemoteEndpoint;
+    property SocketHandle: TSocket read GetSocketHandle;
+  end;
+
+  IPStreamSocket = interface(IPSocket)
+    procedure AsyncSend(const Buffer: MemoryBuffer; const Handler: IOHandler); overload;
+    procedure AsyncReceive(const Buffer: MemoryBuffer; const Handler: IOHandler); overload;
+  end;
+
+function TCPSocket(const Service: IOService): IPStreamSocket;
+
+
+type
+  AsyncSocketStream = class(AsyncStream)
+  private
+    FSocket: IPStreamSocket;
+  public
+    constructor Create(const Socket: IPStreamSocket);
+    destructor Destroy; override;
+
+    procedure AsyncReadSome(const Buffer: MemoryBuffer; const Handler: IOHandler); override;
+    procedure AsyncWriteSome(const Buffer: MemoryBuffer; const Handler: IOHandler); override;
+
+    property Socket: IPStreamSocket read FSocket;
+  end;
+
+
 implementation
 
 uses
   System.RegularExpressions, AsyncIO.ErrorCodes, IdWship6,
-  System.SysUtils, System.Math, Winapi.Windows;
+  System.SysUtils, System.Math, Winapi.Windows, AsyncIO.Detail,
+  AsyncIO.Net.IP.Detail.TCPImpl;
 
 { IPv4Address }
 
@@ -690,6 +748,22 @@ begin
   end;
 end;
 
+function IPEndpoint.GetData: Pointer;
+begin
+  if (IsIPv4) then
+    result := @Fv4
+  else //if (IsIPv6) then
+    result := @Fv6;
+end;
+
+function IPEndpoint.GetDataLength: integer;
+begin
+  if (IsIPv4) then
+    result := SizeOf(Fv4)
+  else //if (IsIPv6) then
+    result := SizeOf(Fv6);
+end;
+
 function IPEndpoint.GetIsIPv4: boolean;
 begin
   result := FBase.ss_family = AF_INET;
@@ -1016,6 +1090,47 @@ begin
   result := Results.Create(ResolveQuery.HostName, ResolveQuery.ServiceName, addr);
 
   FreeAddrInfoEx(PADDRINFOEXA(addr));
+end;
+
+function TCPSocket(const Service: IOService): IPStreamSocket;
+begin
+  result := TTCPSocketImpl.Create(Service);
+end;
+
+{ AsyncSocketStream }
+
+procedure AsyncSocketStream.AsyncReadSome(const Buffer: MemoryBuffer;
+  const Handler: IOHandler);
+begin
+  Socket.AsyncReceive(Buffer, Handler);
+end;
+
+procedure AsyncSocketStream.AsyncWriteSome(const Buffer: MemoryBuffer;
+  const Handler: IOHandler);
+begin
+  Socket.AsyncSend(Buffer, Handler);
+end;
+
+constructor AsyncSocketStream.Create(const Socket: IPStreamSocket);
+//var
+//  res: WinsockResult;
+//  arg: Cardinal;
+begin
+  inherited Create(Socket.Service);
+
+  FSocket := Socket;
+
+  // make it non-blocking
+//  arg := 1;
+//  res := ioctlsocket(Socket, FIONBIO, arg);
+end;
+
+destructor AsyncSocketStream.Destroy;
+begin
+  Socket.Shutdown();
+  Socket.Close();
+
+  inherited;
 end;
 
 initialization

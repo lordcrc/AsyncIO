@@ -93,6 +93,8 @@ type
 
     procedure AsyncReadSome(const Buffer: MemoryBuffer; const Handler: IOHandler); override;
     procedure AsyncWriteSome(const Buffer: MemoryBuffer; const Handler: IOHandler); override;
+
+    property Handle: THandle read FHandle;
   end;
 
   FileAccess = (faRead, faWrite, faReadWrite);
@@ -125,7 +127,7 @@ procedure AsyncWrite(const Stream: AsyncStream; const Buffer: MemoryBuffer; cons
 implementation
 
 uses
-  System.Math;
+  System.Math, AsyncIO.Detail;
 
 {$POINTERMATH ON}
 
@@ -319,106 +321,10 @@ begin
   Stream.AsyncWriteSome(MakeBuffer(Buffer, n), writeOp);
 end;
 
-
-type
-  IOCPContext = class
-  private
-    FOverlapped: TOverlapped;
-    function GetOverlapped: POverlapped;
-    function GetOverlappedOffset: UInt64;
-    procedure SetOverlappedOffset(const Value: UInt64);
-  public
-    property Overlapped: POverlapped read GetOverlapped;
-    property OverlappedOffset: UInt64 read GetOverlappedOffset write SetOverlappedOffset;
-
-    procedure ExecHandler(const ec: IOErrorCode; const transferred: Int64); virtual;
-
-    class function FromOverlapped(const Overlapped: POverlapped): IOCPContext;
-  end;
-
-  HandlerContext = class(IOCPContext)
-  private
-    FHandler: CompletionHandler;
-  public
-    constructor Create(const Handler: CompletionHandler);
-
-    procedure ExecHandler(const ec: IOErrorCode; const transferred: Int64); override;
-
-    property Handler: CompletionHandler read FHandler;
-  end;
-
-  IOHandlerContext = class(IOCPContext)
-  private
-    FHandler: IOHandler;
-  public
-    constructor Create(const Handler: IOHandler);
-
-    procedure ExecHandler(const ec: IOErrorCode; const transferred: Int64); override;
-
-    property Handler: IOHandler read FHandler;
-  end;
-
-{ IOCPContext }
-
-procedure IOCPContext.ExecHandler(const ec: IOErrorCode; const transferred: Int64);
-begin
-  raise ENotImplemented.Create('Invalid context handler');
-end;
-
-class function IOCPContext.FromOverlapped(const Overlapped: POverlapped): IOCPContext;
-type
-  PUInt8 = ^UInt8;
-begin
-  result := TObject(PUInt8(Overlapped) - 4) as IOCPContext;
-end;
-
-function IOCPContext.GetOverlapped: POverlapped;
-begin
-  result := @FOverlapped;
-end;
-
-function IOCPContext.GetOverlappedOffset: UInt64;
-begin
-  result := FOverlapped.Offset  + (UInt64(FOverlapped.OffsetHigh) shl 32);
-end;
-
-procedure IOCPContext.SetOverlappedOffset(const Value: UInt64);
-begin
-  FOverlapped.Offset := UInt32(Value and $ffffffff);
-  FOverlapped.OffsetHigh := UInt32((Value shr 32) and $ffffffff);
-end;
-
-{ HandlerContext }
-
-constructor HandlerContext.Create(const Handler: CompletionHandler);
-begin
-  inherited Create;
-
-  FHandler := Handler;
-end;
-
-procedure HandlerContext.ExecHandler(const ec: IOErrorCode; const transferred: Int64);
-begin
-  Handler();
-end;
-
-{ IOHandlerContext }
-
-constructor IOHandlerContext.Create(const Handler: IOHandler);
-begin
-  inherited Create;
-
-  FHandler := Handler;
-end;
-
 const
   COMPLETION_KEY_EXIT = 0;
   COMPLETION_KEY_OPERATION = 1;
-
-procedure IOHandlerContext.ExecHandler(const ec: IOErrorCode; const transferred: Int64);
-begin
-  Handler(ec, transferred);
-end;
+  COMPLETION_KEY_OPERATION_DIR = 2;
 
 { IOService }
 
@@ -464,7 +370,12 @@ var
 begin
   result := 0;
 
+  ctx := nil;
+  overlapped := nil;
   res := GetQueuedCompletionStatus(IOCP, transferred, completionKey, overlapped, Timeout);
+
+//  WriteLn('DEBUG completion key: ', completionKey);
+//  WriteLn(Format('DEBUG completion overlapped: %.8x', [NativeUInt(overlapped)]));
 
   if res then
   begin
@@ -489,9 +400,10 @@ begin
   if completionKey = COMPLETION_KEY_EXIT then
     exit;
 
-  Assert(completionKey = COMPLETION_KEY_OPERATION, 'Invalid completion key');
+  Assert((completionKey = COMPLETION_KEY_OPERATION) or (completionKey = COMPLETION_KEY_OPERATION_DIR), 'Invalid completion key');
 
   ctx := IOCPContext.FromOverlapped(overlapped);
+//  WriteLn(Format('DEBUG exec context: %.8x', [NativeUInt(ctx)]));
 
   try
     result := 1;
@@ -564,7 +476,7 @@ begin
   while True do
   begin
     r := RunOne();
-    if r = 0 then
+    if (r = 0) and (Stopped) then
       break;
     result := result + 1;
   end;
@@ -579,7 +491,12 @@ begin
     exit;
   end;
 
-  result := DoPollOne(INFINITE);
+  // From Boost.ASIO:
+  // Timeout to use with GetQueuedCompletionStatus. Some versions of windows
+  // have a "bug" where a call to GetQueuedCompletionStatus can appear stuck
+  // even though there are events waiting on the queue. Using a timeout helps
+  // to work around the issue.
+  result := DoPollOne(500);
 end;
 
 procedure IOService.Stop;
@@ -630,7 +547,7 @@ begin
   // offset is ignored if handle does not support it
   ctx.OverlappedOffset := FOffset;
   bytesRead := 0;
-  res := ReadFile(FHandle, Buffer.Data^, Buffer.Size, bytesRead, ctx.Overlapped);
+  res := ReadFile(Handle, Buffer.Data^, Buffer.Size, bytesRead, ctx.Overlapped);
   if (not res) then
   begin
     ec := GetLastError;
@@ -639,13 +556,9 @@ begin
   end
   else
   begin
+    // completed directly, but completion entry is queued by manager
     // no async action, call handler directly
-    Service.Post(
-      procedure
-      begin
-        ctx.ExecHandler(IOErrorCode.Success, bytesRead);
-      end
-    );
+//    IOServicePostCompletion(Service, bytesRead, ctx);
   end;
 end;
 
@@ -665,7 +578,7 @@ begin
   );
   // offset is ignored if handle does not support it
   ctx.OverlappedOffset := FOffset;
-  res := WriteFile(FHandle, Buffer.Data^, Buffer.Size, bytesWritten, ctx.Overlapped);
+  res := WriteFile(Handle, Buffer.Data^, Buffer.Size, bytesWritten, ctx.Overlapped);
   if (not res) then
   begin
     ec := GetLastError;
@@ -674,13 +587,9 @@ begin
   end
   else
   begin
+    // completed directly, but completion entry is queued by manager
     // no async action, call handler directly
-    Service.Post(
-      procedure
-      begin
-        ctx.ExecHandler(IOErrorCode.Success, bytesWritten);
-      end
-    );
+//    IOServicePostCompletion(Service, bytesWritten, ctx);
   end;
 end;
 
