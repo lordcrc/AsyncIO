@@ -103,6 +103,7 @@ type
     class operator Equal(const A, B: IPAddressFamily): boolean; inline;
     class operator NotEqual(const A, B: IPAddressFamily): boolean; inline;
 
+    class function Unspecified: IPAddressFamily; static;
     class function v4: IPAddressFamily; static;
     class function v6: IPAddressFamily; static;
   end;
@@ -147,7 +148,7 @@ function Endpoint(const Address: IPAddress; const PortNumber: UInt16): IPEndpoin
 type
   IPProtocol = record
   strict private
-    FFamily: integer;
+    FFamily: IPAddressFamily;
     FSocketType: integer;
     FProtocol: integer;
   public
@@ -173,7 +174,7 @@ type
     class function UDP: UDPProtocol; static;
     class function Unspecified: IPProtocol; static;
 
-    property Family: integer read FFamily;
+    property Family: IPAddressFamily read FFamily;
     property SocketType: integer read FSocketType;
     property Protocol: integer read FProtocol;
   end;
@@ -277,6 +278,10 @@ type
     function GetRemoteEndpoint: IPEndpoint;
     function GetSocketHandle: TSocket;
 {$ENDREGION}
+
+    procedure AsyncConnect(const PeerEndpoint: IPEndpoint; const Handler: OpHandler);
+
+    procedure Bind(const LocalEndpoint: IPEndpoint);
 
     procedure Connect(const PeerEndpoint: IPEndpoint);
     procedure Close;
@@ -659,6 +664,11 @@ begin
   result := A.FValue <> B.FValue;
 end;
 
+class function IPAddressFamily.Unspecified: IPAddressFamily;
+begin
+  result.FValue := AF_UNSPEC;
+end;
+
 class function IPAddressFamily.v4: IPAddressFamily;
 begin
   result.FValue := AF_INET;
@@ -849,7 +859,7 @@ end;
 
 class function IPProtocol.Unspecified: IPProtocol;
 begin
-  result.FFamily := AF_UNSPEC;
+  result.FFamily := IPAddressFamily.Unspecified;
   result.FSocketType := 0;
   result.FProtocol := IPPROTO_IP;
 end;
@@ -858,21 +868,21 @@ end;
 
 class function IPProtocol.ICMPProtocol.Unspecified: IPProtocol;
 begin
-  result.FFamily := AF_UNSPEC;
+  result.FFamily := IPAddressFamily.Unspecified;
   result.FSocketType := SOCK_RAW;
   result.FProtocol := IPPROTO_ICMP;
 end;
 
 class function IPProtocol.ICMPProtocol.v4: IPProtocol;
 begin
-  result.FFamily := AF_INET;
+  result.FFamily := IPAddressFamily.v4;
   result.FSocketType := SOCK_RAW;
   result.FProtocol := IPPROTO_ICMP;
 end;
 
 class function IPProtocol.ICMPProtocol.v6: IPProtocol;
 begin
-  result.FFamily := AF_INET6;
+  result.FFamily := IPAddressFamily.v6;
   result.FSocketType := SOCK_RAW;
   result.FProtocol := IPPROTO_ICMP;
 end;
@@ -881,21 +891,21 @@ end;
 
 class function IPProtocol.TCPProtocol.Unspecified: IPProtocol;
 begin
-  result.FFamily := AF_UNSPEC;
+  result.FFamily := IPAddressFamily.Unspecified;
   result.FSocketType := SOCK_STREAM;
   result.FProtocol := IPPROTO_TCP;
 end;
 
 class function IPProtocol.TCPProtocol.v4: IPProtocol;
 begin
-  result.FFamily := AF_INET;
+  result.FFamily := IPAddressFamily.v4;
   result.FSocketType := SOCK_STREAM;
   result.FProtocol := IPPROTO_TCP;
 end;
 
 class function IPProtocol.TCPProtocol.v6: IPProtocol;
 begin
-  result.FFamily := AF_INET6;
+  result.FFamily := IPAddressFamily.v6;
   result.FSocketType := SOCK_STREAM;
   result.FProtocol := IPPROTO_TCP;
 end;
@@ -904,21 +914,21 @@ end;
 
 class function IPProtocol.UDPProtocol.Unspecified: IPProtocol;
 begin
-  result.FFamily := AF_UNSPEC;
+  result.FFamily := IPAddressFamily.Unspecified;
   result.FSocketType := SOCK_DGRAM;
   result.FProtocol := IPPROTO_UDP;
 end;
 
 class function IPProtocol.UDPProtocol.v4: IPProtocol;
 begin
-  result.FFamily := AF_INET;
+  result.FFamily := IPAddressFamily.v4;
   result.FSocketType := SOCK_DGRAM;
   result.FProtocol := IPPROTO_UDP;
 end;
 
 class function IPProtocol.UDPProtocol.v6: IPProtocol;
 begin
-  result.FFamily := AF_INET6;
+  result.FFamily := IPAddressFamily.v4;
   result.FSocketType := SOCK_DGRAM;
   result.FProtocol := IPPROTO_UDP;
 end;
@@ -1112,24 +1122,14 @@ begin
 end;
 
 constructor AsyncSocketStream.Create(const Socket: IPStreamSocket);
-//var
-//  res: WinsockResult;
-//  arg: Cardinal;
 begin
   inherited Create(Socket.Service);
 
   FSocket := Socket;
-
-  // make it non-blocking
-//  arg := 1;
-//  res := ioctlsocket(Socket, FIONBIO, arg);
 end;
 
 destructor AsyncSocketStream.Destroy;
 begin
-  Socket.Shutdown();
-  Socket.Close();
-
   inherited;
 end;
 

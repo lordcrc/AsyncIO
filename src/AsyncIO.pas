@@ -23,7 +23,7 @@ uses
 
 type
   CompletionHandler = reference to procedure;
-  WaitHandler = reference to procedure(const ErrorCode: IOErrorCode);
+  OpHandler = reference to procedure(const ErrorCode: IOErrorCode);
   IOHandler = reference to procedure(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64);
 
 type

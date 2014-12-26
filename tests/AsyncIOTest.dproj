@@ -92,6 +92,7 @@
         <DCCReference Include="..\src\AsyncIO.pas"/>
         <DCCReference Include="..\src\AsyncIO.Detail.pas"/>
         <DCCReference Include="..\src\AsyncIO.Net.IP.pas"/>
+        <DCCReference Include="..\src\AsyncIO.Net.IP.Detail.pas"/>
         <DCCReference Include="..\src\AsyncIO.Net.IP.Detail.TCPImpl.pas"/>
         <DCCReference Include="AsyncIO.Test.Basic.pas"/>
         <DCCReference Include="AsyncIO.Test.Copy.pas"/>

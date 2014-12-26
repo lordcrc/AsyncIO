@@ -10,6 +10,7 @@ uses
   AsyncIO in '..\src\AsyncIO.pas',
   AsyncIO.Detail in '..\src\AsyncIO.Detail.pas',
   AsyncIO.Net.IP in '..\src\AsyncIO.Net.IP.pas',
+  AsyncIO.Net.IP.Detail in '..\src\AsyncIO.Net.IP.Detail.pas',
   AsyncIO.Net.IP.Detail.TCPImpl in '..\src\AsyncIO.Net.IP.Detail.TCPImpl.pas',
   AsyncIO.Test.Basic in 'AsyncIO.Test.Basic.pas',
   AsyncIO.Test.Copy in 'AsyncIO.Test.Copy.pas',

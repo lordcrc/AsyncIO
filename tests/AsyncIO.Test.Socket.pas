@@ -74,14 +74,19 @@ end;
 type
   EchoClient = class
   private
-    FRequestData: string;
-    FResponse: TBytes;
+    FRequest: string;
+    FRequestData: TBytes;
+    FResponseData: TBytes;
+    FSocket: IPStreamSocket;
     FStream: AsyncSocketStream;
 
+    procedure ConnectHandler(const ErrorCode: IOErrorCode);
     procedure ReadHandler(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64);
     procedure WriteHandler(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64);
   public
-    constructor Create(const Socket: IPStreamSocket; const RequestData: string);
+    constructor Create(const Service: IOService;
+      const ServerEndpoint: IPEndpoint;
+      const Request: string);
     destructor Destroy; override;
   end;
 
@@ -90,7 +95,6 @@ var
   qry: IPResolver.Query;
   res: IPResolver.Results;
   ip: IPResolver.Entry;
-  sock: IPStreamSocket;
   ios: IOService;
   client: EchoClient;
   r: Int64;
@@ -98,7 +102,6 @@ begin
   qry := Query(IPProtocol.TCPProtocol.v4, 'localhost', '7', [ResolveAllMatching]);
   res := IPResolver.Resolve(qry);
 
-//  WriteLn('Resolved ' + qry.HostName + ':' + qry.ServiceName + ' as');
   for ip in res do
     // TODO - fix this crap, need way to get first result
     break;
@@ -111,11 +114,8 @@ begin
 
     WriteLn('Connecting to ' + ip.Endpoint);
 
-    sock := TCPSocket(ios);
-    sock.Connect(ip.Endpoint);
-
     WriteLn('Sending echo request');
-    client := EchoClient.Create(sock, 'Hello Internet!');
+    client := EchoClient.Create(ios, ip.Endpoint, 'Hello Internet!');
 
     r := ios.Run;
 
@@ -138,24 +138,30 @@ end;
 
 { EchoClient }
 
-constructor EchoClient.Create(const Socket: IPStreamSocket;
-  const RequestData: string);
-var
-  data: TBytes;
-  datalen: integer;
+procedure EchoClient.ConnectHandler(const ErrorCode: IOErrorCode);
+begin
+  if (not ErrorCode) then
+    RaiseLastOSError(ErrorCode.Value);
+
+  FRequestData := TEncoding.Unicode.GetBytes(FRequest);
+
+  // we'll use a socket stream for the actual read/write operations
+  FStream := AsyncSocketStream.Create(FSocket);
+
+  AsyncWrite(FStream, FRequestData, TransferAll(), WriteHandler);
+end;
+
+constructor EchoClient.Create(
+  const Service: IOService;
+  const ServerEndpoint: IPEndpoint;
+  const Request: string);
 begin
   inherited Create;
 
-  FRequestData := RequestData;
-  FStream := AsyncSocketStream.Create(Socket);
+  FRequest := Request;
+  FSocket := TCPSocket(Service);
 
-  data := TEncoding.Unicode.GetBytes(FRequestData);
-  datalen := Length(data);
-
-  SetLength(FResponse, datalen);
-
-  // queue write to start things
-  AsyncWrite(FStream, data, TransferAll(), WriteHandler);
+  FSocket.AsyncConnect(ServerEndpoint, ConnectHandler);
 end;
 
 destructor EchoClient.Destroy;
@@ -169,14 +175,27 @@ procedure EchoClient.ReadHandler(const ErrorCode: IOErrorCode;
   const BytesTransferred: UInt64);
 var
   s: string;
+  responseMatches: boolean;
 begin
   if (not ErrorCode) then
     RaiseLastOSError(ErrorCode.Value);
 
-  s := TEncoding.Unicode.GetString(FResponse, 0, BytesTransferred);
+  s := TEncoding.Unicode.GetString(FResponseData, 0, BytesTransferred);
 
   WriteLn('Echo reply: "' + s + '"');
 
+  // compare request and reply
+  responseMatches := (Length(FRequestData) = Length(FResponseData)) and
+    CompareMem(@FRequestData[0], @FResponseData[0], Length(FRequestData));
+
+  if (responseMatches) then
+    WriteLn('Response matches, yay')
+  else
+    WriteLn('RESPONSE DOES NOT MATCH');
+
+  FSocket.Close();
+
+  // and we're done...
   FStream.Socket.Service.Stop;
 end;
 
@@ -186,7 +205,14 @@ begin
   if (not ErrorCode) then
     RaiseLastOSError(ErrorCode.Value);
 
-  AsyncRead(FStream, FResponse, TransferAtLeast(Length(FResponse)), ReadHandler);
+  // half close
+  FSocket.Shutdown(SocketShutdownWrite);
+
+  // zero our response buffer so we know we got the right stuff back
+  FResponseData := nil;
+  SetLength(FResponseData, Length(FRequestData));
+
+  AsyncRead(FStream, FResponseData, TransferAtLeast(Length(FResponseData)), ReadHandler);
 end;
 
 end.

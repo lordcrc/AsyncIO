@@ -29,11 +29,21 @@ type
     FHandler: CompletionHandler;
   public
     constructor Create(const Handler: CompletionHandler);
-    destructor Destroy; override;
 
     procedure ExecHandler(const ec: IOErrorCode; const transferred: Int64); override;
 
     property Handler: CompletionHandler read FHandler;
+  end;
+
+  OpHandlerContext = class(IOCPContext)
+  private
+    FHandler: OpHandler;
+  public
+    constructor Create(const Handler: OpHandler);
+
+    procedure ExecHandler(const ec: IOErrorCode; const transferred: Int64); override;
+
+    property Handler: OpHandler read FHandler;
   end;
 
   IOHandlerContext = class(IOCPContext)
@@ -145,16 +155,24 @@ begin
   FHandler := Handler;
 end;
 
-destructor HandlerContext.Destroy;
-begin
-  FHandler := nil;
-
-  inherited;
-end;
-
 procedure HandlerContext.ExecHandler(const ec: IOErrorCode; const transferred: Int64);
 begin
   Handler();
+end;
+
+{ OpHandlerContext }
+
+constructor OpHandlerContext.Create(const Handler: OpHandler);
+begin
+  inherited Create;
+
+  FHandler := Handler;
+end;
+
+procedure OpHandlerContext.ExecHandler(const ec: IOErrorCode;
+  const transferred: Int64);
+begin
+  Handler(ec);
 end;
 
 { IOHandlerContext }

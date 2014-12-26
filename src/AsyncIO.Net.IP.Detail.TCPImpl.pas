@@ -28,6 +28,10 @@ type
     function GetRemoteEndpoint: IPEndpoint;
     function GetSocketHandle: TSocket;
 
+    procedure AsyncConnect(const PeerEndpoint: IPEndpoint; const Handler: OpHandler);
+
+    procedure Bind(const LocalEndpoint: IPEndpoint);
+
     procedure Connect(const PeerEndpoint: IPEndpoint);
     procedure Close;
 
@@ -44,9 +48,62 @@ type
 implementation
 
 uses
-  Winapi.Windows, System.SysUtils, AsyncIO.ErrorCodes, AsyncIO.Detail;
+  Winapi.Windows, System.SysUtils, AsyncIO.ErrorCodes, AsyncIO.Detail, AsyncIO.Net.IP.Detail;
 
 { TTCPSocketImpl }
+
+procedure TTCPSocketImpl.AsyncConnect(const PeerEndpoint: IPEndpoint;
+  const Handler: OpHandler);
+var
+  bytesSent: DWORD;
+  ctx: OpHandlerContext;
+  res: boolean;
+  ec: DWORD;
+  localEndpoint: IPEndpoint;
+begin
+  if (PeerEndpoint.IsIPv4) then
+    FProtocol := IPProtocol.TCP.v4
+  else if (PeerEndpoint.IsIPv6) then
+    FProtocol := IPProtocol.TCP.v6
+  else
+    FProtocol := IPProtocol.TCP.Unspecified;
+
+  if not SocketInitialized then
+    CreateSocket;
+
+  ctx := OpHandlerContext.Create(
+    procedure(const ErrorCode: IOErrorCode)
+    var
+      err: DWORD;
+      ec: IOErrorCode;
+    begin
+      ec := ErrorCode;
+      if (ec) then
+      begin
+        // update socket options
+        err := IdWinsock2.setsockopt(SocketHandle, SOL_SOCKET, SO_UPDATE_CONNECT_CONTEXT, nil, 0);
+        if (err <> 0) then
+          // set code from GetLastError
+          ec := IOErrorCode.Create();
+      end;
+
+      // if connect succeeded but setsockopt failed, pass the error from the latter
+      Handler(ec);
+    end
+  );
+
+  // bind local endpoint to any address/port
+  localEndpoint := Endpoint(Protocol.Family, 0);
+  Bind(localEndpoint);
+
+  res := IdWinsock2.ConnectEx(SocketHandle, PeerEndpoint.Data, PeerEndpoint.DataLength, nil, 0, bytesSent, PWSAOverlapped(ctx.Overlapped));
+  if (not res) then
+  begin
+    ec := GetLastError;
+    if (ec <> WSA_IO_PENDING) then
+      RaiseLastOSError(ec);
+  end;
+end;
 
 procedure TTCPSocketImpl.AsyncReceive(const Buffer: MemoryBuffer;
   const Handler: IOHandler);
@@ -101,6 +158,13 @@ begin
     // no async action, call handler directly
 //    IOServicePostCompletion(Service, bytesSent, ctx);
   end;
+end;
+
+procedure TTCPSocketImpl.Bind(const LocalEndpoint: IPEndpoint);
+var
+  res: WinsockResult;
+begin
+  res := IdWinsock2.bind(SocketHandle, LocalEndpoint.Data, LocalEndpoint.DataLength);
 end;
 
 procedure TTCPSocketImpl.Close;
