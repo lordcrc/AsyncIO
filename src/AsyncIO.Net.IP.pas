@@ -126,6 +126,8 @@ type
   public
     class operator Implicit(const Endpoint: IPEndpoint): string;
 
+    class function FromData(const Data; const DataLength: integer): IPEndpoint; static;
+
     property Address: IPAddress read GetAddress write SetAddress;
     property Port: UInt16 read GetPort write SetPort;
 
@@ -726,7 +728,7 @@ class function IPEndpoint.Create(const SocketAddress4: PSockAddrIn;
   const AddressLength: NativeUInt): IPEndpoint;
 begin
   if (AddressLength < SizeOf(result.Fv4)) then
-    raise EArgumentException.Create('Unknown socket address type');
+    raise EArgumentException.Create('IPEndpoint.Create: Unknown socket address type');
 
   Move(SocketAddress4^, result.Fv4, SizeOf(result.Fv4));
 end;
@@ -735,12 +737,26 @@ class function IPEndpoint.Create(const SocketAddress6: PSockAddrIn6;
   const AddressLength: NativeUInt): IPEndpoint;
 begin
   if (AddressLength < SizeOf(TSockAddrIn6)) then
-    raise EArgumentException.Create('Unknown socket address type');
+    raise EArgumentException.Create('IPEndpoint.Create: Unknown socket address type');
 
   if (AddressLength < SizeOf(result.Fv6)) then
     FillChar(result.Fv6, SizeOf(result.Fv6), 0);
 
   Move(SocketAddress6^, result.Fv6, Min(AddressLength, SizeOf(result.Fv6)));
+end;
+
+class function IPEndpoint.FromData(const Data;
+  const DataLength: integer): IPEndpoint;
+begin
+  if DataLength < SizeOf(result.Fv4) then
+    raise EArgumentException.Create('IPEndpoint.FromData: Unknown socket address type');
+
+  case PSockAddrIn(@Data)^.sin_family of
+    AF_INET: result := IPEndpoint.Create(PSockAddrIn(@Data), DataLength);
+    AF_INET6: result := IPEndpoint.Create(PSockAddrIn6(@Data), DataLength);
+  else
+    raise EArgumentException.Create('IPEndpoint.FromData: Unknown address family');
+  end;
 end;
 
 function IPEndpoint.GetAddress: IPAddress;

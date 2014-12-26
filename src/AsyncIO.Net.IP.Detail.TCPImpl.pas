@@ -92,7 +92,9 @@ begin
     end
   );
 
-  // bind local endpoint to any address/port
+  // ConnectEx requires a bound socket, so
+  // bind local endpoint to and unspecified address and make the
+  // provider assign a port
   localEndpoint := Endpoint(Protocol.Family, 0);
   Bind(localEndpoint);
 
@@ -226,8 +228,17 @@ begin
 end;
 
 function TTCPSocketImpl.GetLocalEndpoint: IPEndpoint;
+var
+  addr: TSockAddrIn6;
+  addrlen: integer;
+  res: WinSockResult;
 begin
+  FillChar(addr, SizeOf(addr), 0);
+  addrlen := SizeOf(addr);
 
+  res := IdWinsock2.getsockname(SocketHandle, @addr, addrlen);
+
+  result := IPEndpoint.FromData(addr, addrlen);
 end;
 
 function TTCPSocketImpl.GetProtocol: IPProtocol;
@@ -241,8 +252,17 @@ begin
 end;
 
 function TTCPSocketImpl.GetRemoteEndpoint: IPEndpoint;
+var
+  addr: TSockAddrIn6;
+  addrlen: integer;
+  res: WinSockResult;
 begin
+  FillChar(addr, SizeOf(addr), 0);
+  addrlen := SizeOf(addr);
 
+  res := IdWinsock2.getpeername(SocketHandle, @addr, addrlen);
+
+  result := IPEndpoint.FromData(addr, addrlen);
 end;
 
 function TTCPSocketImpl.GetService: IOService;
