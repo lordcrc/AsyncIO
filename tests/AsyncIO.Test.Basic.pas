@@ -33,16 +33,14 @@ begin
   ios := nil;
   scanner := nil;
   try
-    ios := IOService.Create;
-
-    ios.Initialize();
+    ios := NewIOService();
 
     inputFilename := ParamStr(1);
 
     if (inputFilename = '') then
       raise Exception.Create('Missing command line parameter');
 
-    scanner := FileScanner.Create(ios, 'e:\Temp\firebox\firebox.gif');
+    scanner := FileScanner.Create(ios, inputFilename);
 
     ios.Post(
       procedure
@@ -63,7 +61,6 @@ begin
 
   finally
     scanner.Free;
-    ios.Free;
   end;
 end;
 

@@ -42,9 +42,7 @@ begin
   ios := nil;
   copier := nil;
   try
-    ios := IOService.Create;
-
-    ios.Initialize();
+    ios := NewIOService();
 
     inputFilename := ParamStr(1);
     outputFilename := ParamStr(2);
@@ -61,7 +59,6 @@ begin
 
   finally
     copier.Free;
-    ios.Free;
   end;
 end;
 

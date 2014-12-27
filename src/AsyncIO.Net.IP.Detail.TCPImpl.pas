@@ -81,6 +81,7 @@ begin
       if (ec) then
       begin
         // update socket options
+        // ConnectEx requires this
         err := IdWinsock2.setsockopt(SocketHandle, SOL_SOCKET, SO_UPDATE_CONNECT_CONTEXT, nil, 0);
         if (err <> 0) then
           // set code from GetLastError

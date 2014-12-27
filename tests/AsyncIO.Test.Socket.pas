@@ -109,8 +109,7 @@ begin
   ios := nil;
   client := nil;
   try
-    ios := IOService.Create;
-    ios.Initialize();
+    ios := NewIOService;
 
     WriteLn('Connecting to ' + ip.Endpoint);
 
@@ -122,7 +121,6 @@ begin
     WriteLn(Format('%d handlers executed', [r]));
   finally
     client.Free;
-    ios.Free;
   end;
 end;
 

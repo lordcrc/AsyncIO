@@ -29,21 +29,10 @@ type
 type
   EIOServiceStopped = class(Exception);
 
-  IOService = class
-  strict private
-    FIOCP: THandle;
-    FStopped: integer;
-
+  IOService = interface
+{$REGION 'Property accessors'}
     function GetStopped: boolean;
-    function DoPollOne(const Timeout: DWORD): integer;
-    procedure DoDequeueStoppedHandlers;
-  protected
-    property IOCP: THandle read FIOCP;
-  public
-    constructor Create;
-    destructor Destroy; override;
-
-    procedure Initialize(const MaxConcurrentThreads: Cardinal = 0);
+{$ENDREGION}
 
     function Poll: Int64;
     function PollOne: Int64;
@@ -58,6 +47,9 @@ type
     property Stopped: boolean read GetStopped;
   end;
 
+function NewIOService(const MaxConcurrentThreads: Cardinal = 0): IOService;
+
+type
   MemoryBuffer = record
   strict private
     FData: pointer;
@@ -130,6 +122,11 @@ uses
   System.Math, AsyncIO.Detail;
 
 {$POINTERMATH ON}
+
+function NewIOService(const MaxConcurrentThreads: Cardinal = 0): IOService;
+begin
+  result := IOServiceImpl.Create(MaxConcurrentThreads);
+end;
 
 function MakeBuffer(const Buffer: MemoryBuffer; const MaxSize: cardinal): MemoryBuffer;
 begin
@@ -321,191 +318,6 @@ begin
   Stream.AsyncWriteSome(MakeBuffer(Buffer, n), writeOp);
 end;
 
-const
-  COMPLETION_KEY_EXIT = 0;
-  COMPLETION_KEY_OPERATION = 1;
-  COMPLETION_KEY_OPERATION_DIR = 2;
-
-{ IOService }
-
-constructor IOService.Create;
-begin
-  inherited Create;
-
-  FIOCP := INVALID_HANDLE_VALUE;
-end;
-
-destructor IOService.Destroy;
-begin
-  if (IOCP <> INVALID_HANDLE_VALUE) then
-    CloseHandle(IOCP);
-
-  inherited;
-end;
-
-procedure IOService.DoDequeueStoppedHandlers;
-var
-  r: integer;
-begin
-  if not Stopped then
-    exit;
-
-  // dequeue all pending handlers
-  while True do
-  begin
-    r := DoPollOne(0);
-    if (r = 0) then
-      break;
-  end;
-end;
-
-function IOService.DoPollOne(const Timeout: DWORD): integer;
-var
-  res: boolean;
-  overlapped: POverlapped;
-  completionKey: ULONG_PTR;
-  transferred: DWORD;
-  ec: IOErrorCode;
-  ctx: IOCPContext;
-begin
-  result := 0;
-
-  ctx := nil;
-  overlapped := nil;
-  res := GetQueuedCompletionStatus(IOCP, transferred, completionKey, overlapped, Timeout);
-
-//  WriteLn('DEBUG completion key: ', completionKey);
-//  WriteLn(Format('DEBUG completion overlapped: %.8x', [NativeUInt(overlapped)]));
-
-  if res then
-  begin
-    ec := IOErrorCode.Success;
-  end
-  else
-  begin
-    ec := IOErrorCode.Create();
-    if Assigned(overlapped) then
-    begin
-      // failed IO operation, trigger handler
-    end
-    else if ec.Value = WAIT_TIMEOUT then
-    begin
-      // nothing to do
-      exit;
-    end
-    else
-      RaiseLastOSError;
-  end;
-
-  if completionKey = COMPLETION_KEY_EXIT then
-    exit;
-
-  Assert((completionKey = COMPLETION_KEY_OPERATION) or (completionKey = COMPLETION_KEY_OPERATION_DIR), 'Invalid completion key');
-
-  ctx := IOCPContext.FromOverlapped(overlapped);
-//  WriteLn(Format('DEBUG exec context: %.8x', [NativeUInt(ctx)]));
-
-  try
-    result := 1;
-    if not Stopped then
-      ctx.ExecHandler(ec, transferred);
-  finally
-    ctx.Free;
-  end;
-end;
-
-function IOService.GetStopped: boolean;
-begin
-  result := FStopped <> 0;
-end;
-
-procedure IOService.Initialize(const MaxConcurrentThreads: Cardinal = 0);
-begin
-  Assert(IOCP = INVALID_HANDLE_VALUE, 'IOService already Initialized');
-
-  FIOCP := CreateIoCompletionPort(INVALID_HANDLE_VALUE, 0, 0, MaxConcurrentThreads);
-  if (FIOCP = 0) then
-  begin
-    FIOCP := INVALID_HANDLE_VALUE;
-    RaiseLastOSError;
-  end;
-end;
-
-function IOService.Poll: Int64;
-var
-  r: Int64;
-begin
-  result := 0;
-  while True do
-  begin
-    r := PollOne();
-    if r = 0 then
-      break;
-    result := result + 1;
-  end;
-end;
-
-function IOService.PollOne: Int64;
-begin
-  result := 0;
-  if Stopped then
-  begin
-    DoDequeueStoppedHandlers;
-    exit;
-  end;
-
-  result := DoPollOne(0);
-end;
-
-procedure IOService.Post(const Handler: CompletionHandler);
-var
-  ctx: HandlerContext;
-begin
-  if Stopped then
-    raise EIOServiceStopped.Create('Cannot post to a stopped IOService');
-
-  ctx := HandlerContext.Create(Handler);
-  PostQueuedCompletionStatus(IOCP, 0, COMPLETION_KEY_OPERATION, ctx.Overlapped);
-end;
-
-function IOService.Run: Int64;
-var
-  r: Int64;
-begin
-  result := 0;
-  while True do
-  begin
-    r := RunOne();
-    if (r = 0) and (Stopped) then
-      break;
-    result := result + 1;
-  end;
-end;
-
-function IOService.RunOne: Int64;
-begin
-  result := 0;
-  if Stopped then
-  begin
-    DoDequeueStoppedHandlers;
-    exit;
-  end;
-
-  // From Boost.ASIO:
-  // Timeout to use with GetQueuedCompletionStatus. Some versions of windows
-  // have a "bug" where a call to GetQueuedCompletionStatus can appear stuck
-  // even though there are events waiting on the queue. Using a timeout helps
-  // to work around the issue.
-  result := DoPollOne(500);
-end;
-
-procedure IOService.Stop;
-begin
-  InterlockedExchange(FStopped, 1);
-  CancelIo(IOCP);
-  PostQueuedCompletionStatus(IOCP, 0, COMPLETION_KEY_EXIT, nil);
-end;
-
 { MemoryBuffer }
 
 class operator MemoryBuffer.Implicit(const a: TBytes): MemoryBuffer;
@@ -635,10 +447,7 @@ begin
   // CreateIoCompletionPort call below fails
   inherited Create(Service, fh);
 
-  cph := CreateIoCompletionPort(fh, Service.IOCP, COMPLETION_KEY_OPERATION, 0);
-
-  if (cph = 0) then
-    RaiseLastOSError;
+  IOServiceAssociateHandle(Service, fh);
 end;
 
 end.

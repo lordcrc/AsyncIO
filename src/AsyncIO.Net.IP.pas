@@ -751,6 +751,8 @@ begin
   if DataLength < SizeOf(result.Fv4) then
     raise EArgumentException.Create('IPEndpoint.FromData: Unknown socket address type');
 
+  // if data is at least as larger as SockAddrIn, we'll just assume
+  // it contains at least the family identifier
   case PSockAddrIn(@Data)^.sin_family of
     AF_INET: result := IPEndpoint.Create(PSockAddrIn(@Data), DataLength);
     AF_INET6: result := IPEndpoint.Create(PSockAddrIn6(@Data), DataLength);
