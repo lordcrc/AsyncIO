@@ -87,7 +87,6 @@ type
     constructor Create(const Service: IOService;
       const ServerEndpoint: IPEndpoint;
       const Request: string);
-    destructor Destroy; override;
   end;
 
 procedure TestEcho;
@@ -148,7 +147,7 @@ begin
   FRequestData := TEncoding.Unicode.GetBytes(FRequest);
 
   // we'll use a socket stream for the actual read/write operations
-  FStream := AsyncSocketStream.Create(FSocket);
+  FStream := NewAsyncSocketStream(FSocket);
 
   AsyncWrite(FStream, FRequestData, TransferAll(), WriteHandler);
 end;
@@ -164,13 +163,6 @@ begin
   FSocket := TCPSocket(Service);
 
   FSocket.AsyncConnect(ServerEndpoint, ConnectHandler);
-end;
-
-destructor EchoClient.Destroy;
-begin
-  FStream.Free;
-
-  inherited;
 end;
 
 procedure EchoClient.ReadHandler(const ErrorCode: IOErrorCode;

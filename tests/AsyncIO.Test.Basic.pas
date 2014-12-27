@@ -7,7 +7,7 @@ procedure RunBasicTest;
 implementation
 
 uses
-  System.SysUtils, AsyncIO, AsyncIO.ErrorCodes;
+  System.SysUtils, AsyncIO, AsyncIO.ErrorCodes, AsyncIO.Filesystem;
 
 type
   FileScanner = class
@@ -19,7 +19,6 @@ type
     procedure ReadHandler(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64);
   public
     constructor Create(const Service: IOService; const Filename: string);
-    destructor Destroy; override;
   end;
 
 
@@ -71,7 +70,7 @@ begin
   inherited Create;
 
   SetLength(FBuffer, 4*1024*1024);
-  FStream := AsyncFileStream.Create(Service, Filename, fcOpenExisting, faRead, fsNone);
+  FStream := NewAsyncFileStream(Service, Filename, fcOpenExisting, faRead, fsNone);
 
   Service.Post(
     procedure
@@ -79,13 +78,6 @@ begin
       DoReadData;
     end
   );
-end;
-
-destructor FileScanner.Destroy;
-begin
-  FStream.Free;
-
-  inherited;
 end;
 
 procedure FileScanner.DoReadData;

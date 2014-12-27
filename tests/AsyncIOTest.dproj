@@ -91,6 +91,8 @@
         <DCCReference Include="..\src\AsyncIO.ErrorCodes.pas"/>
         <DCCReference Include="..\src\AsyncIO.pas"/>
         <DCCReference Include="..\src\AsyncIO.Detail.pas"/>
+        <DCCReference Include="..\src\AsyncIO.Filesystem.pas"/>
+        <DCCReference Include="..\src\AsyncIO.Filesystem.Detail.pas"/>
         <DCCReference Include="..\src\AsyncIO.Net.IP.pas"/>
         <DCCReference Include="..\src\AsyncIO.Net.IP.Detail.pas"/>
         <DCCReference Include="..\src\AsyncIO.Net.IP.Detail.TCPImpl.pas"/>

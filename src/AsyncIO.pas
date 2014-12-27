@@ -30,9 +30,9 @@ type
   EIOServiceStopped = class(Exception);
 
   IOService = interface
-{$REGION 'Property accessors'}
+    {$REGION 'Property accessors'}
     function GetStopped: boolean;
-{$ENDREGION}
+    {$ENDREGION}
 
     function Poll: Int64;
     function PollOne: Int64;
@@ -63,42 +63,31 @@ type
     property Size: cardinal read FSize;
   end;
 
-  AsyncStream = class
-  private
-    FIOService: IOService;
-  protected
-    property Service: IOService read FIOService;
-  public
-    constructor Create(const Service: IOService);
+  AsyncStream = interface
+    {$REGION 'Property accessors'}
+    function GetService: IOService;
+    {$ENDREGION}
 
-    procedure AsyncReadSome(const Buffer: MemoryBuffer; const Handler: IOHandler); virtual; abstract;
-    procedure AsyncWriteSome(const Buffer: MemoryBuffer; const Handler: IOHandler); virtual; abstract;
+    procedure AsyncReadSome(const Buffer: MemoryBuffer; const Handler: IOHandler);
+    procedure AsyncWriteSome(const Buffer: MemoryBuffer; const Handler: IOHandler);
+
+    property Service: IOService read GetService;
   end;
 
-  AsyncHandleStream = class(AsyncStream)
-  private
-    FHandle: THandle;
-    FOffset: UInt64;
-  public
-    constructor Create(const Service: IOService; const Handle: THandle);
-    destructor Destroy; override;
+  AsyncHandleStream = interface(AsyncStream)
+    {$REGION 'Property accessors'}
+    function GetHandle: THandle;
+    {$ENDREGION}
 
-    procedure AsyncReadSome(const Buffer: MemoryBuffer; const Handler: IOHandler); override;
-    procedure AsyncWriteSome(const Buffer: MemoryBuffer; const Handler: IOHandler); override;
-
-    property Handle: THandle read FHandle;
+    property Handle: THandle read GetHandle;
   end;
 
-  FileAccess = (faRead, faWrite, faReadWrite);
+  AsyncFileStream = interface(AsyncHandleStream)
+    {$REGION 'Property accessors'}
+    function GetFilename: string;
+    {$ENDREGION}
 
-  FileCreationDisposition = (fcCreateNew, fcCreateAlways, fcOpenExisting, fcOpenAlways, fcTruncateExisting);
-
-  FileShareMode = (fsNone, fsDelete, fsRead, fsWrite, fsReadWrite);
-
-  AsyncFileStream = class(AsyncHandleStream)
-  public
-    constructor Create(const Service: IOService; const Filename: string;
-      const CreationDisposition: FileCreationDisposition; const Access: FileAccess; const ShareMode: FileShareMode);
+    property Filename: string read GetFilename;
   end;
 
   // returns 0 if io operation is complete, otherwise the maximum number of bytes for the subsequent request
@@ -329,125 +318,6 @@ end;
 procedure MemoryBuffer.SetSize(const MaxSize: cardinal);
 begin
   FSize := Min(FSize, MaxSize);
-end;
-
-{ AsyncStream }
-
-constructor AsyncStream.Create(const Service: IOService);
-begin
-  inherited Create;
-
-  FIOService := Service;
-end;
-
-{ AsyncHandleStream }
-
-procedure AsyncHandleStream.AsyncReadSome(const Buffer: MemoryBuffer; const Handler: IOHandler);
-var
-  bytesRead: DWORD;
-  ctx: IOHandlerContext;
-  res: boolean;
-  ec: DWORD;
-begin
-  ctx := IOHandlerContext.Create(
-    procedure(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64)
-    begin
-      FOffset := FOffset + BytesTransferred;
-      Handler(ErrorCode, BytesTransferred);
-    end
-  );
-  // offset is ignored if handle does not support it
-  ctx.OverlappedOffset := FOffset;
-  bytesRead := 0;
-  res := ReadFile(Handle, Buffer.Data^, Buffer.Size, bytesRead, ctx.Overlapped);
-  if (not res) then
-  begin
-    ec := GetLastError;
-    if (ec <> ERROR_IO_PENDING) then
-      RaiseLastOSError(ec);
-  end
-  else
-  begin
-    // completed directly, but completion entry is queued by manager
-    // no async action, call handler directly
-//    IOServicePostCompletion(Service, bytesRead, ctx);
-  end;
-end;
-
-procedure AsyncHandleStream.AsyncWriteSome(const Buffer: MemoryBuffer; const Handler: IOHandler);
-var
-  bytesWritten: DWORD;
-  ctx: IOHandlerContext;
-  res: boolean;
-  ec: DWORD;
-begin
-  ctx := IOHandlerContext.Create(
-    procedure(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64)
-    begin
-      FOffset := FOffset + BytesTransferred;
-      Handler(ErrorCode, BytesTransferred);
-    end
-  );
-  // offset is ignored if handle does not support it
-  ctx.OverlappedOffset := FOffset;
-  res := WriteFile(Handle, Buffer.Data^, Buffer.Size, bytesWritten, ctx.Overlapped);
-  if (not res) then
-  begin
-    ec := GetLastError;
-    if (ec <> ERROR_IO_PENDING) then
-      RaiseLastOSError(ec);
-  end
-  else
-  begin
-    // completed directly, but completion entry is queued by manager
-    // no async action, call handler directly
-//    IOServicePostCompletion(Service, bytesWritten, ctx);
-  end;
-end;
-
-constructor AsyncHandleStream.Create(const Service: IOService; const Handle: THandle);
-begin
-  inherited Create(Service);
-
-  FHandle := Handle;
-end;
-
-destructor AsyncHandleStream.Destroy;
-begin
-  CloseHandle(FHandle);
-
-  inherited;
-end;
-
-{ AsyncFileStream }
-
-constructor AsyncFileStream.Create(const Service: IOService; const Filename: string;
-  const CreationDisposition: FileCreationDisposition; const Access: FileAccess; const ShareMode: FileShareMode);
-const
-  AccessMapping: array[FileAccess] of DWORD = (GENERIC_READ, GENERIC_WRITE, GENERIC_READ or GENERIC_WRITE);
-  CreationDispositionMapping: array[FileCreationDisposition] of DWORD = (CREATE_NEW, CREATE_ALWAYS, OPEN_EXISTING, OPEN_ALWAYS, TRUNCATE_EXISTING);
-  ShareModeMapping: array[FileShareMode] of DWORD = (0, FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE, FILE_SHARE_READ or FILE_SHARE_WRITE);
-var
-  fh, cph: THandle;
-  ac, sm, cd, flags: DWORD;
-begin
-  ac := AccessMapping[Access];
-  sm := ShareModeMapping[ShareMode];
-  cd := CreationDispositionMapping[CreationDisposition];
-
-  flags := FILE_ATTRIBUTE_NORMAL or FILE_FLAG_OVERLAPPED;
-
-  fh := CreateFile(PChar(Filename), ac, sm, nil, cd, flags, 0);
-
-  if (fh = INVALID_HANDLE_VALUE) then
-    RaiseLastOSError();
-
-  // call create here
-  // so that the handle is closed if the
-  // CreateIoCompletionPort call below fails
-  inherited Create(Service, fh);
-
-  IOServiceAssociateHandle(Service, fh);
 end;
 
 end.

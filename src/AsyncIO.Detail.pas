@@ -103,6 +103,35 @@ type
     property Stopped: boolean read GetStopped;
   end;
 
+  AsyncStreamImplBase = class(TInterfacedObject, AsyncStream)
+  private
+    FService: IOService;
+  public
+    constructor Create(const Service: IOService);
+
+    function GetService: IOService;
+
+    procedure AsyncReadSome(const Buffer: MemoryBuffer; const Handler: IOHandler); virtual; abstract;
+    procedure AsyncWriteSome(const Buffer: MemoryBuffer; const Handler: IOHandler); virtual; abstract;
+
+    property Service: IOService read FService;
+  end;
+
+  AsyncHandleStreamImpl = class(AsyncStreamImplBase, AsyncHandleStream)
+  private
+    FHandle: THandle;
+    FOffset: UInt64;
+  public
+    constructor Create(const Service: IOService; const Handle: THandle);
+    destructor Destroy; override;
+
+    function GetHandle: THandle;
+
+    procedure AsyncReadSome(const Buffer: MemoryBuffer; const Handler: IOHandler); override;
+    procedure AsyncWriteSome(const Buffer: MemoryBuffer; const Handler: IOHandler); override;
+
+    property Handle: THandle read FHandle;
+  end;
 
 implementation
 
@@ -414,6 +443,107 @@ begin
   InterlockedExchange(FStopped, 1);
   CancelIo(IOCP);
   PostQueuedCompletionStatus(IOCP, 0, COMPLETION_KEY_EXIT, nil);
+end;
+
+{ AsyncStreamImplBase }
+
+constructor AsyncStreamImplBase.Create(const Service: IOService);
+begin
+  inherited Create;
+
+  FService := Service;
+end;
+
+function AsyncStreamImplBase.GetService: IOService;
+begin
+  result := FService;
+end;
+
+{ AsyncHandleStreamImpl }
+
+procedure AsyncHandleStreamImpl.AsyncReadSome(const Buffer: MemoryBuffer;
+  const Handler: IOHandler);
+var
+  bytesRead: DWORD;
+  ctx: IOHandlerContext;
+  res: boolean;
+  ec: DWORD;
+begin
+  ctx := IOHandlerContext.Create(
+    procedure(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64)
+    begin
+      FOffset := FOffset + BytesTransferred;
+      Handler(ErrorCode, BytesTransferred);
+    end
+  );
+  // offset is ignored if handle does not support it
+  ctx.OverlappedOffset := FOffset;
+  bytesRead := 0;
+  res := ReadFile(Handle, Buffer.Data^, Buffer.Size, bytesRead, ctx.Overlapped);
+  if (not res) then
+  begin
+    ec := GetLastError;
+    if (ec <> ERROR_IO_PENDING) then
+      RaiseLastOSError(ec);
+  end
+  else
+  begin
+    // completed directly, but completion entry is queued by manager
+    // no async action, call handler directly
+//    IOServicePostCompletion(Service, bytesRead, ctx);
+  end;
+end;
+
+procedure AsyncHandleStreamImpl.AsyncWriteSome(const Buffer: MemoryBuffer;
+  const Handler: IOHandler);
+var
+  bytesWritten: DWORD;
+  ctx: IOHandlerContext;
+  res: boolean;
+  ec: DWORD;
+begin
+  ctx := IOHandlerContext.Create(
+    procedure(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64)
+    begin
+      FOffset := FOffset + BytesTransferred;
+      Handler(ErrorCode, BytesTransferred);
+    end
+  );
+  // offset is ignored if handle does not support it
+  ctx.OverlappedOffset := FOffset;
+  res := WriteFile(Handle, Buffer.Data^, Buffer.Size, bytesWritten, ctx.Overlapped);
+  if (not res) then
+  begin
+    ec := GetLastError;
+    if (ec <> ERROR_IO_PENDING) then
+      RaiseLastOSError(ec);
+  end
+  else
+  begin
+    // completed directly, but completion entry is queued by manager
+    // no async action, call handler directly
+//    IOServicePostCompletion(Service, bytesWritten, ctx);
+  end;
+end;
+
+constructor AsyncHandleStreamImpl.Create(const Service: IOService;
+  const Handle: THandle);
+begin
+  inherited Create(Service);
+
+  FHandle := Handle;
+end;
+
+destructor AsyncHandleStreamImpl.Destroy;
+begin
+  CloseHandle(FHandle);
+
+  inherited;
+end;
+
+function AsyncHandleStreamImpl.GetHandle: THandle;
+begin
+  result := FHandle;
 end;
 
 end.

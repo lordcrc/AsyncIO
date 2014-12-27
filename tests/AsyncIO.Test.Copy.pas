@@ -7,7 +7,8 @@ procedure RunCopyTest;
 implementation
 
 uses
-  System.SysUtils, System.DateUtils, AsyncIO, AsyncIO.ErrorCodes, System.Math;
+  System.SysUtils, System.DateUtils, AsyncIO, AsyncIO.ErrorCodes, System.Math,
+  AsyncIO.Filesystem;
 
 type
   FileCopier = class
@@ -29,7 +30,6 @@ type
     procedure PrintProgress;
   public
     constructor Create(const Service: IOService; const InputFilename, OutputFilename: string);
-    destructor Destroy; override;
   end;
 
 procedure RunCopyTest;
@@ -70,8 +70,8 @@ begin
   inherited Create;
 
   SetLength(FBuffer, 1024*1024);
-  FInputStream := AsyncFileStream.Create(Service, InputFilename, fcOpenExisting, faRead, fsRead);
-  FOutputStream := AsyncFileStream.Create(Service, OutputFilename, fcCreateAlways, faWrite, fsNone);
+  FInputStream := NewAsyncFileStream(Service, InputFilename, fcOpenExisting, faRead, fsRead);
+  FOutputStream := NewAsyncFileStream(Service, OutputFilename, fcCreateAlways, faWrite, fsNone);
   FDoneReading := False;
 
   Service.Post(
@@ -82,14 +82,6 @@ begin
       AsyncRead(FInputStream, FBuffer, TransferAll(), ReadHandler);
     end
   );
-end;
-
-destructor FileCopier.Destroy;
-begin
-  FInputStream.Free;
-  FOutputStream.Free;
-
-  inherited;
 end;
 
 procedure FileCopier.PrintProgress;

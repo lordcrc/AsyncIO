@@ -9,6 +9,8 @@ uses
   AsyncIO.ErrorCodes in '..\src\AsyncIO.ErrorCodes.pas',
   AsyncIO in '..\src\AsyncIO.pas',
   AsyncIO.Detail in '..\src\AsyncIO.Detail.pas',
+  AsyncIO.Filesystem in '..\src\AsyncIO.Filesystem.pas',
+  AsyncIO.Filesystem.Detail in '..\src\AsyncIO.Filesystem.Detail.pas',
   AsyncIO.Net.IP in '..\src\AsyncIO.Net.IP.pas',
   AsyncIO.Net.IP.Detail in '..\src\AsyncIO.Net.IP.Detail.pas',
   AsyncIO.Net.IP.Detail.TCPImpl in '..\src\AsyncIO.Net.IP.Detail.TCPImpl.pas',

@@ -306,26 +306,27 @@ function TCPSocket(const Service: IOService): IPStreamSocket;
 
 
 type
-  AsyncSocketStream = class(AsyncStream)
-  private
-    FSocket: IPStreamSocket;
-  public
-    constructor Create(const Socket: IPStreamSocket);
-    destructor Destroy; override;
+  AsyncSocketStream = interface(AsyncStream)
+    {$REGION 'Property accessors'}
+    function GetSocket: IPStreamSocket;
+    {$ENDREGION}
 
-    procedure AsyncReadSome(const Buffer: MemoryBuffer; const Handler: IOHandler); override;
-    procedure AsyncWriteSome(const Buffer: MemoryBuffer; const Handler: IOHandler); override;
-
-    property Socket: IPStreamSocket read FSocket;
+    property Socket: IPStreamSocket read GetSocket;
   end;
 
+function NewAsyncSocketStream(const Socket: IPStreamSocket): AsyncSocketStream;
 
 implementation
 
 uses
   System.RegularExpressions, AsyncIO.ErrorCodes, IdWship6,
   System.SysUtils, System.Math, Winapi.Windows, AsyncIO.Detail,
-  AsyncIO.Net.IP.Detail.TCPImpl;
+  AsyncIO.Net.IP.Detail, AsyncIO.Net.IP.Detail.TCPImpl;
+
+function NewAsyncSocketStream(const Socket: IPStreamSocket): AsyncSocketStream;
+begin
+  result := AsyncSocketStreamImpl.Create(Socket);
+end;
 
 { IPv4Address }
 
@@ -1123,32 +1124,6 @@ end;
 function TCPSocket(const Service: IOService): IPStreamSocket;
 begin
   result := TTCPSocketImpl.Create(Service);
-end;
-
-{ AsyncSocketStream }
-
-procedure AsyncSocketStream.AsyncReadSome(const Buffer: MemoryBuffer;
-  const Handler: IOHandler);
-begin
-  Socket.AsyncReceive(Buffer, Handler);
-end;
-
-procedure AsyncSocketStream.AsyncWriteSome(const Buffer: MemoryBuffer;
-  const Handler: IOHandler);
-begin
-  Socket.AsyncSend(Buffer, Handler);
-end;
-
-constructor AsyncSocketStream.Create(const Socket: IPStreamSocket);
-begin
-  inherited Create(Socket.Service);
-
-  FSocket := Socket;
-end;
-
-destructor AsyncSocketStream.Destroy;
-begin
-  inherited;
 end;
 
 initialization
