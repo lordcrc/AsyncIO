@@ -80,9 +80,9 @@ type
     FSocket: IPStreamSocket;
     FStream: AsyncSocketStream;
 
-    procedure ConnectHandler(const ErrorCode: IOErrorCode);
-    procedure ReadHandler(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64);
-    procedure WriteHandler(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64);
+    procedure HandleConnect(const ErrorCode: IOErrorCode);
+    procedure HandleRead(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64);
+    procedure HandleWrite(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64);
   public
     constructor Create(const Service: IOService;
       const ServerEndpoint: IPEndpoint;
@@ -102,7 +102,7 @@ begin
   res := IPResolver.Resolve(qry);
 
   for ip in res do
-    // TODO - fix this crap, need way to get first result
+    // TODO - make connect take resolver result set, connect until success
     break;
 
   ios := nil;
@@ -134,7 +134,7 @@ end;
 
 { EchoClient }
 
-procedure EchoClient.ConnectHandler(const ErrorCode: IOErrorCode);
+procedure EchoClient.HandleConnect(const ErrorCode: IOErrorCode);
 begin
   if (not ErrorCode) then
     RaiseLastOSError(ErrorCode.Value);
@@ -149,7 +149,7 @@ begin
   // we'll use a socket stream for the actual read/write operations
   FStream := NewAsyncSocketStream(FSocket);
 
-  AsyncWrite(FStream, FRequestData, TransferAll(), WriteHandler);
+  AsyncWrite(FStream, FRequestData, TransferAll(), HandleWrite);
 end;
 
 constructor EchoClient.Create(
@@ -162,10 +162,10 @@ begin
   FRequest := Request;
   FSocket := TCPSocket(Service);
 
-  FSocket.AsyncConnect(ServerEndpoint, ConnectHandler);
+  FSocket.AsyncConnect(ServerEndpoint, HandleConnect);
 end;
 
-procedure EchoClient.ReadHandler(const ErrorCode: IOErrorCode;
+procedure EchoClient.HandleRead(const ErrorCode: IOErrorCode;
   const BytesTransferred: UInt64);
 var
   s: string;
@@ -193,7 +193,7 @@ begin
   FStream.Socket.Service.Stop;
 end;
 
-procedure EchoClient.WriteHandler(const ErrorCode: IOErrorCode;
+procedure EchoClient.HandleWrite(const ErrorCode: IOErrorCode;
   const BytesTransferred: UInt64);
 begin
   if (not ErrorCode) then
@@ -206,7 +206,7 @@ begin
   FResponseData := nil;
   SetLength(FResponseData, Length(FRequestData));
 
-  AsyncRead(FStream, FResponseData, TransferAtLeast(Length(FResponseData)), ReadHandler);
+  AsyncRead(FStream, FResponseData, TransferAtLeast(Length(FResponseData)), HandleRead);
 end;
 
 end.
