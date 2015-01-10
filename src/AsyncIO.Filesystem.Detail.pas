@@ -32,7 +32,7 @@ const
   CreationDispositionMapping: array[FileCreationDisposition] of DWORD = (CREATE_NEW, CREATE_ALWAYS, OPEN_EXISTING, OPEN_ALWAYS, TRUNCATE_EXISTING);
   ShareModeMapping: array[FileShareMode] of DWORD = (0, FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE, FILE_SHARE_READ or FILE_SHARE_WRITE);
 var
-  fh, cph: THandle;
+  fh: THandle;
   ac, sm, cd, flags: DWORD;
 begin
   ac := AccessMapping[Access];
