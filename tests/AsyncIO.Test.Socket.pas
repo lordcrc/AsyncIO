@@ -160,7 +160,7 @@ begin
   inherited Create;
 
   FRequest := Request;
-  FSocket := TCPSocket(Service);
+  FSocket := NewTCPSocket(Service);
 
   FSocket.AsyncConnect(ServerEndpoint, HandleConnect);
 end;

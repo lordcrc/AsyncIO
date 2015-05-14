@@ -302,7 +302,7 @@ type
     procedure AsyncReceive(const Buffer: MemoryBuffer; const Handler: IOHandler); overload;
   end;
 
-function TCPSocket(const Service: IOService): IPStreamSocket;
+function NewTCPSocket(const Service: IOService): IPStreamSocket;
 
 
 type
@@ -1121,7 +1121,7 @@ begin
   FreeAddrInfoEx(PADDRINFOEXA(addr));
 end;
 
-function TCPSocket(const Service: IOService): IPStreamSocket;
+function NewTCPSocket(const Service: IOService): IPStreamSocket;
 begin
   result := TTCPSocketImpl.Create(Service);
 end;
