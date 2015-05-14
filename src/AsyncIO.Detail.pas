@@ -3,11 +3,11 @@ unit AsyncIO.Detail;
 interface
 
 uses
-  WinAPI.Windows, AsyncIO, AsyncIO.ErrorCodes;
+  WinAPI.Windows, System.Classes, AsyncIO, AsyncIO.ErrorCodes;
 
 type
   IOCPContext  = class
-  private
+  strict private
     FOverlapped: TOverlapped;
     function GetOverlapped: POverlapped;
     function GetOverlappedOffset: UInt64;
@@ -25,7 +25,7 @@ type
   end;
 
   HandlerContext = class(IOCPContext)
-  private
+  strict private
     FHandler: CompletionHandler;
   public
     constructor Create(const Handler: CompletionHandler);
@@ -36,7 +36,7 @@ type
   end;
 
   OpHandlerContext = class(IOCPContext)
-  private
+  strict private
     FHandler: OpHandler;
   public
     constructor Create(const Handler: OpHandler);
@@ -47,7 +47,7 @@ type
   end;
 
   IOHandlerContext = class(IOCPContext)
-  private
+  strict private
     FHandler: IOHandler;
   public
     constructor Create(const Handler: IOHandler);
@@ -104,7 +104,7 @@ type
   end;
 
   AsyncStreamImplBase = class(TInterfacedObject, AsyncStream)
-  private
+  strict private
     FService: IOService;
   public
     constructor Create(const Service: IOService);
@@ -118,7 +118,7 @@ type
   end;
 
   AsyncHandleStreamImpl = class(AsyncStreamImplBase, AsyncHandleStream)
-  private
+  strict private
     FHandle: THandle;
     FOffset: UInt64;
   public
@@ -136,7 +136,7 @@ type
 implementation
 
 uses
-  System.SysUtils;
+  System.SysUtils, System.Math;
 
 {$POINTERMATH ON}
 
