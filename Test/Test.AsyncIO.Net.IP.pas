@@ -146,12 +146,12 @@ var
   IPv4Addr: IPv4Address;
   ReturnValue: string;
 begin
-  Addr := $0A010203;
+  Addr := IPv4Address.Loopback.Data;
   IPv4Addr := IPv4Address(Addr);
 
   ReturnValue := IPv4Addr;
 
-  CheckEquals(ReturnValue, '10.1.2.3', 'Implicit cast returned wrong address');
+  CheckEquals('127.0.0.1', ReturnValue, 'Implicit cast returned wrong address');
 end;
 
 procedure TestIPv4Address.TestTryFromString;
@@ -163,11 +163,11 @@ begin
 
   ReturnValue := IPv4Address.TryFromString('1.2.3.4', IPv4Addr);
   CheckTrue(ReturnValue, 'TryFromString failed to convert address 1');
-  CheckEqualsHex($04030201, IPv4Addr.Data, 'TryFromString returned wrong address 1');
+  CheckEqualsHex($01020304, IPv4Addr.Data, 'TryFromString returned wrong address 1');
 
   ReturnValue := IPv4Address.TryFromString('127.0.0.1', IPv4Addr);
   CheckTrue(ReturnValue, 'TryFromString failed to convert address 2');
-  CheckEqualsHex($0100007F, IPv4Addr.Data, 'TryFromString returned wrong address 2');
+  CheckEqualsHex($7F000001, IPv4Addr.Data, 'TryFromString returned wrong address 2');
 
   ReturnValue := IPv4Address.TryFromString('100.200.300.400', IPv4Addr);
   CheckFalse(ReturnValue, 'TryFromString failed reject bad address');
@@ -312,7 +312,7 @@ var
 begin
   FillChar(Data, SizeOf(Data), 0);
   Data.sin_family := AF_INET;
-  Data.sin_port := 42;
+  Data.sin_port := htons(42);
   Data.sin_addr.S_addr := INADDR_LOOPBACK;
 
   ReturnValue := IPEndpoint.FromData(Data, SizeOf(Data));
@@ -320,7 +320,7 @@ begin
   CheckTrue(ReturnValue.IsIPv4, 'Failed to set IPv4 address 1');
   CheckFalse(ReturnValue.IsIPv6, 'Failed to set IPv4 address 2');
   CheckEquals(ReturnValue.Address.AsIPv4, IPv4Address(ntohl(Data.sin_addr.S_addr)), 'Failed to set IPv4 address 3');
-  CheckEquals(Data.sin_port, ReturnValue.Port, 'Failed to set port');
+  CheckEquals(42, ReturnValue.Port, 'Failed to set port');
 end;
 
 procedure TestIPEndpoint.TestFromDataIPv6;
@@ -333,15 +333,15 @@ var
 begin
   FillChar(Data, SizeOf(Data), 0);
   Data.sin6_family := AF_INET6;
-  Data.sin6_port := 42;
+  Data.sin6_port := htons(42);
   Move(Addr, Data.sin6_addr.s6_bytes, 16);
 
   ReturnValue := IPEndpoint.FromData(Data, SizeOf(Data));
 
-  CheckFalse(ReturnValue.IsIPv6, 'Failed to set IPv6 address 1');
+  CheckFalse(ReturnValue.IsIPv4, 'Failed to set IPv6 address 1');
   CheckTrue(ReturnValue.IsIPv6, 'Failed to set IPv6 address 2');
   CheckEquals(ReturnValue.Address.AsIPv6, IPv6Address(Addr), 'Failed to set IPv6 address 3');
-  CheckEquals(Data.sin6_port, ReturnValue.Port, 'Failed to set port');
+  CheckEquals(42, ReturnValue.Port, 'Failed to set port');
 end;
 
 procedure TestIPEndpoint.TestGetAddressIPv4;
@@ -411,8 +411,8 @@ begin
 
   Endp.Address := Addr;
 
-  CheckTrue(Endp.IsIPv6, 'Failed to set IPv6 address 1');
-  CheckFalse(Endp.IsIPv6, 'Failed to set IPv6 address 2');
+  CheckFalse(Endp.IsIPv4, 'Failed to set IPv6 address 1');
+  CheckTrue(Endp.IsIPv6, 'Failed to set IPv6 address 2');
   CheckEquals(Addr, Endp.Address, 'Failed to set IPv6 address 3');
 end;
 

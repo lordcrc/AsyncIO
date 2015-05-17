@@ -341,12 +341,12 @@ end;
 
 class function IPv4Address.Any: IPv4Address;
 begin
-  result.FAddress := INADDR_ANY;
+  result.FAddress := htonl(INADDR_ANY);
 end;
 
 class function IPv4Address.Broadcast: IPv4Address;
 begin
-  result.FAddress := INADDR_BROADCAST;
+  result.FAddress := htonl(INADDR_BROADCAST);
 end;
 
 class operator IPv4Address.Equal(const Addr1, Addr2: IPv4Address): boolean;
@@ -366,17 +366,17 @@ end;
 
 function IPv4Address.GetIsLoopback: boolean;
 begin
-  result := ((FAddress and $ff000000) = $7f000000);
+  result := ((Data and $ff000000) = $7f000000);
 end;
 
 function IPv4Address.GetIsMulticast: boolean;
 begin
-  result := ((FAddress and $f0000000) = $e0000000);
+  result := ((Data and $f0000000) = $e0000000);
 end;
 
 function IPv4Address.GetIsUnspecified: boolean;
 begin
-  result := (FAddress = 0);
+  result := (Data = 0);
 end;
 
 class operator IPv4Address.Implicit(const IPAddress: IPv4Address): string;
@@ -390,7 +390,7 @@ begin
   sockAddr.sin_family := AF_INET;
   sockAddr.sin_addr.S_addr := IPAddress.FAddress;
 
-  SetLength(result, 256);
+  SetLength(result, 32);
   len := Length(result);
 
   res := WSAAddressToString(@sockAddr, SizeOf(sockAddr), nil, @result[1], len);
@@ -400,7 +400,7 @@ end;
 
 class function IPv4Address.Loopback: IPv4Address;
 begin
-  result.FAddress := INADDR_LOOPBACK;
+  result.FAddress := htonl(INADDR_LOOPBACK);
 end;
 
 class operator IPv4Address.NotEqual(const Addr1, Addr2: IPv4Address): boolean;
@@ -435,7 +435,7 @@ begin
   else // r = 0
   begin
     result := True;
-    Addr.FAddress := htonl(sockAddr.sin_addr.S_addr);
+    Addr.FAddress := sockAddr.sin_addr.S_addr;
   end;
 end;
 
