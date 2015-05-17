@@ -57,7 +57,7 @@ end;
 
 function AsyncSocketStreamImpl.GetSocket: IPStreamSocket;
 begin
-
+  result := FSocket;
 end;
 
 end.
