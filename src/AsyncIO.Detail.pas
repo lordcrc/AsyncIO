@@ -430,12 +430,15 @@ begin
     exit;
   end;
 
-  // From Boost.ASIO:
-  // Timeout to use with GetQueuedCompletionStatus. Some versions of windows
-  // have a "bug" where a call to GetQueuedCompletionStatus can appear stuck
-  // even though there are events waiting on the queue. Using a timeout helps
-  // to work around the issue.
-  result := DoPollOne(500);
+  while (result <= 0) and (not Stopped) do
+  begin
+    // From Boost.ASIO:
+    // Timeout to use with GetQueuedCompletionStatus. Some versions of windows
+    // have a "bug" where a call to GetQueuedCompletionStatus can appear stuck
+    // even though there are events waiting on the queue. Using a timeout helps
+    // to work around the issue.
+    result := DoPollOne(500);
+  end;
 end;
 
 procedure IOServiceImpl.Stop;
