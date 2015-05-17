@@ -374,7 +374,7 @@ begin
   while True do
   begin
     r := PollOne();
-    if r = 0 then
+    if (r = 0) then
       break;
     result := result + 1;
   end;
