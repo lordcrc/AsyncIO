@@ -338,12 +338,12 @@ end;
 
 class function IPv4Address.Any: IPv4Address;
 begin
-  result := IPv4Address(INADDR_ANY);
+  result.FAddress := INADDR_ANY;
 end;
 
 class function IPv4Address.Broadcast: IPv4Address;
 begin
-  result := IPv4Address(INADDR_BROADCAST);
+  result.FAddress := INADDR_BROADCAST;
 end;
 
 class operator IPv4Address.Equal(const Addr1, Addr2: IPv4Address): boolean;
@@ -397,7 +397,7 @@ end;
 
 class function IPv4Address.Loopback: IPv4Address;
 begin
-  result := IPv4Address(INADDR_LOOPBACK);
+  result.FAddress := INADDR_LOOPBACK;
 end;
 
 class operator IPv4Address.NotEqual(const Addr1, Addr2: IPv4Address): boolean;
@@ -411,7 +411,7 @@ var
   sockAddr: TSockAddr;
   len: integer;
   r: integer;
-  res: WinsockResult;
+  res: integer;
 begin
   FillChar(sockAddr, SizeOf(TSockAddr), 0);
 
@@ -421,14 +421,18 @@ begin
 
   r := WSAStringToAddress(PChar(s), sockAddr.sin_family, nil, sockAddr, len);
   result := False;
-  if (r = WSAEINVAL) then
-    exit
-  else if (r <> 0) then
-    res := r
+  if (r = SOCKET_ERROR) then
+  begin
+    res := WSAGetLastError();
+    if (res = WSAEINVAL) then
+      exit
+    else
+      RaiseLastOSError(res);
+  end
   else // r = 0
   begin
     result := True;
-    Addr.FAddress := sockAddr.sin_addr.S_addr;
+    Addr.FAddress := htonl(sockAddr.sin_addr.S_addr);
   end;
 end;
 

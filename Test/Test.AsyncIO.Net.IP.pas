@@ -147,11 +147,11 @@ begin
 
   ReturnValue := IPv4Address.TryFromString('1.2.3.4', IPv4Addr);
   CheckTrue(ReturnValue, 'TryFromString failed to convert address 1');
-  CheckEqualsHex($01020304, IPv4Addr.Data, 'TryFromString returned wrong address 1');
+  CheckEqualsHex($04030201, IPv4Addr.Data, 'TryFromString returned wrong address 1');
 
   ReturnValue := IPv4Address.TryFromString('127.0.0.1', IPv4Addr);
   CheckTrue(ReturnValue, 'TryFromString failed to convert address 2');
-  CheckEqualsHex($7F000001, IPv4Addr.Data, 'TryFromString returned wrong address 2');
+  CheckEqualsHex($0100007F, IPv4Addr.Data, 'TryFromString returned wrong address 2');
 
   ReturnValue := IPv4Address.TryFromString('100.200.300.400', IPv4Addr);
   CheckFalse(ReturnValue, 'TryFromString failed reject bad address');
@@ -197,7 +197,7 @@ end;
 procedure TestIPv6Address.TestTryFromString;
 const
   Addr1: IPv6Address.IPv6AddressBytes =
-    ($01, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, $42);
+    (0, $01, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, $42);
   Addr2: IPv6Address.IPv6AddressBytes =
     (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, $01);
 var
@@ -209,10 +209,6 @@ begin
   ReturnValue := IPv6Address.TryFromString('1::42', IPv6Addr);
   CheckTrue(ReturnValue, 'TryFromString failed to convert address');
   CheckEquals(IPv6Address(Addr1), IPv6Addr, 'TryFromString returned wrong address 1');
-
-  ReturnValue := IPv6Address.TryFromString('localhost', IPv6Addr);
-  CheckTrue(ReturnValue, 'TryFromString failed to convert address');
-  CheckEquals(IPv6Address(Addr2), IPv6Addr, 'TryFromString returned wrong address 2');
 
   ReturnValue := IPv6Address.TryFromString('10.0.0.1', IPv6Addr);
   CheckFalse(ReturnValue, 'TryFromString failed reject bad address');
