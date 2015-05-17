@@ -22,7 +22,10 @@ type
     class operator Explicit(const Addr: UInt32): IPv4Address;
     class operator Implicit(const IPAddress: IPv4Address): string;
 
-    class function TryStrToIPv4Address(const s: string; out Addr: IPv4Address): boolean; static;
+    class operator Equal(const Addr1, Addr2: IPv4Address): boolean;
+    class operator NotEqual(const Addr1, Addr2: IPv4Address): boolean;
+
+    class function TryFromString(const s: string; out Addr: IPv4Address): boolean; static;
 
     property IsLoopback: boolean read GetIsLoopback;
     property IsMulticast: boolean read GetIsMulticast;
@@ -51,7 +54,10 @@ type
     class operator Explicit(const Addr: IPv6AddressBytes): IPv6Address;
     class operator Implicit(const IPAddress: IPv6Address): string;
 
-    class function TryStrToIPv6Address(const s: string; out Addr: IPv6Address): boolean; static;
+    class operator Equal(const Addr1, Addr2: IPv6Address): boolean;
+    class operator NotEqual(const Addr1, Addr2: IPv6Address): boolean;
+
+    class function TryFromString(const s: string; out Addr: IPv6Address): boolean; static;
 
     property IsLoopback: boolean read GetIsLoopback;
     property IsMulticast: boolean read GetIsMulticast;
@@ -340,6 +346,11 @@ begin
   result := IPv4Address(INADDR_BROADCAST);
 end;
 
+class operator IPv4Address.Equal(const Addr1, Addr2: IPv4Address): boolean;
+begin
+  result := Addr1.FAddress = Addr2.FAddress;
+end;
+
 class operator IPv4Address.Explicit(const Addr: UInt32): IPv4Address;
 begin
   result.FAddress := htonl(Addr);
@@ -389,7 +400,12 @@ begin
   result := IPv4Address(INADDR_LOOPBACK);
 end;
 
-class function IPv4Address.TryStrToIPv4Address(const s: string;
+class operator IPv4Address.NotEqual(const Addr1, Addr2: IPv4Address): boolean;
+begin
+  result := Addr1.FAddress <> Addr2.FAddress;
+end;
+
+class function IPv4Address.TryFromString(const s: string;
   out Addr: IPv4Address): boolean;
 var
   sockAddr: TSockAddr;
@@ -428,6 +444,12 @@ class function IPv6Address.Create(const Addr: IPv6AddressBytes;
 begin
   result := IPv6Address(Addr);
   result.FScopeID := ScopeId;
+end;
+
+class operator IPv6Address.Equal(const Addr1, Addr2: IPv6Address): boolean;
+begin
+  result := CompareMem(@Addr1.FAddress, @Addr2.FAddress, 16);
+  result := result and (Addr1.ScopeId = Addr2.ScopeId);
 end;
 
 class operator IPv6Address.Explicit(const Addr: IPv6AddressBytes): IPv6Address;
@@ -498,7 +520,12 @@ begin
   result.FAddress[15] := 1;
 end;
 
-class function IPv6Address.TryStrToIPv6Address(const s: string;
+class operator IPv6Address.NotEqual(const Addr1, Addr2: IPv6Address): boolean;
+begin
+  result := not (Addr1 = Addr2);
+end;
+
+class function IPv6Address.TryFromString(const s: string;
   out Addr: IPv6Address): boolean;
 type
   TSockAddrHack = record
@@ -511,7 +538,7 @@ var
   len: integer;
   res: integer;
 begin
-  FillChar(sockAddr, SizeOf(TSockAddr), 0);
+  FillChar(sockAddr, SizeOf(sockAddr), 0);
 
   sockAddr.in6.sin6_family := AF_INET6;
 
@@ -545,14 +572,14 @@ var
   addr6: IPv6Address;
   res: boolean;
 begin
-  res := IPv6Address.TryStrToIPv6Address(s, addr6);
+  res := IPv6Address.TryFromString(s, addr6);
   if (res) then
   begin
     result.AsIPv6 := addr6;
     exit;
   end;
 
-  res := IPv4Address.TryStrToIPv4Address(s, addr4);
+  res := IPv4Address.TryFromString(s, addr4);
   if (res) then
   begin
     result.AsIPv4 := addr4;
@@ -624,7 +651,7 @@ begin
     atV4: result := IPAddress.FIPv4Addr;
     atV6: result := IPAddress.FIPv6Addr;
   else
-    raise ENotImplemented.Create('Address to string');
+    raise ENotImplemented.Create('IPAddress to string');
   end;
 end;
 
