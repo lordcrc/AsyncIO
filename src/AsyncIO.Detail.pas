@@ -278,6 +278,12 @@ end;
 
 destructor IOServiceImpl.Destroy;
 begin
+  if (not Stopped) then
+  begin
+    Stop;
+    DoDequeueStoppedHandlers;
+  end;
+
   if (IOCP <> INVALID_HANDLE_VALUE) then
     CloseHandle(IOCP);
 
