@@ -85,6 +85,9 @@ type
     class operator Implicit(const IPAddress: IPv6Address): IPAddress; inline;
     class operator Implicit(const IPAddress: IPAddress): string; inline;
 
+    class operator Equal(const Addr1, Addr2: IPAddress): boolean;
+    class operator NotEqual(const Addr1, Addr2: IPAddress): boolean;
+
     property IsIPv4: boolean read GetIsIPv4;
     property IsIPv6: boolean read GetIsIPv6;
     property IsLoopback: boolean read GetIsLoopback;
@@ -570,6 +573,19 @@ end;
 
 { IPAddress }
 
+class operator IPAddress.Equal(const Addr1, Addr2: IPAddress): boolean;
+begin
+  result := False;
+  if (Addr1.IsIPv4 and Addr2.IsIPv4) then
+  begin
+    result := Addr1.AsIPv4 = Addr2.AsIPv4
+  end
+  else if (Addr1.IsIPv6 and Addr2.IsIPv6) then
+  begin
+    result := Addr1.AsIPv6 = Addr2.AsIPv6;
+  end;
+end;
+
 class operator IPAddress.Explicit(const s: string): IPAddress;
 var
   addr4: IPv4Address;
@@ -657,6 +673,11 @@ begin
   else
     raise ENotImplemented.Create('IPAddress to string');
   end;
+end;
+
+class operator IPAddress.NotEqual(const Addr1, Addr2: IPAddress): boolean;
+begin
+  result := not (Addr1 = Addr2);
 end;
 
 class operator IPAddress.Implicit(const IPAddress: IPv4Address): IPAddress;

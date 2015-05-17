@@ -53,6 +53,22 @@ type
     procedure TestGetAsIPv4;
     procedure TestGetAsIPv6;
   end;
+  // Test methods for class IPEndpoint
+
+  TestIPEndpoint = class(TNetTestCase)
+  strict private
+  public
+    procedure SetUp; override;
+    procedure TearDown; override;
+  published
+    procedure TestImplicitCast;
+    procedure TestFromDataIPv4;
+    procedure TestFromDataIPv6;
+    procedure TestSetAddressIPv4;
+    procedure TestSetAddressIPv6;
+    procedure TestGetAddressIPv4;
+    procedure TestGetAddressIPv6;
+  end;
   // Test methods for class IPSocket
 
   TestIPSocket = class(TNetTestCase)
@@ -198,8 +214,6 @@ procedure TestIPv6Address.TestTryFromString;
 const
   Addr1: IPv6Address.IPv6AddressBytes =
     (0, $01, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, $42);
-  Addr2: IPv6Address.IPv6AddressBytes =
-    (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, $01);
 var
   IPv6Addr: IPv6Address;
   ReturnValue: boolean;
@@ -279,6 +293,127 @@ begin
   CheckTrue(Addr.IsIPv6, 'IPAddress failed to set IPv6 address 2');
   CheckTrue(Addr.IsLoopback, 'IPAddress failed to set IPv6 address 3');
   CheckFalse(Addr.IsMulticast, 'IPAddress failed to set IPv6 address 4');
+end;
+
+procedure TestIPEndpoint.SetUp;
+begin
+
+end;
+
+procedure TestIPEndpoint.TearDown;
+begin
+
+end;
+
+procedure TestIPEndpoint.TestFromDataIPv4;
+var
+  Data: sockaddr_in;
+  ReturnValue: IPEndpoint;
+begin
+  FillChar(Data, SizeOf(Data), 0);
+  Data.sin_family := AF_INET;
+  Data.sin_port := 42;
+  Data.sin_addr.S_addr := INADDR_LOOPBACK;
+
+  ReturnValue := IPEndpoint.FromData(Data, SizeOf(Data));
+
+  CheckTrue(ReturnValue.IsIPv4, 'Failed to set IPv4 address 1');
+  CheckFalse(ReturnValue.IsIPv6, 'Failed to set IPv4 address 2');
+  CheckEquals(ReturnValue.Address.AsIPv4, IPv4Address(ntohl(Data.sin_addr.S_addr)), 'Failed to set IPv4 address 3');
+  CheckEquals(Data.sin_port, ReturnValue.Port, 'Failed to set port');
+end;
+
+procedure TestIPEndpoint.TestFromDataIPv6;
+const
+  Addr: IPv6Address.IPv6AddressBytes =
+    ($01, $02, $03, $04, $05, $06, $07, $08, $09, $0A, $0B, $0C, $0D, $0E, $0F, $10);
+var
+  Data: SOCKADDR_IN6;
+  ReturnValue: IPEndpoint;
+begin
+  FillChar(Data, SizeOf(Data), 0);
+  Data.sin6_family := AF_INET6;
+  Data.sin6_port := 42;
+  Move(Addr, Data.sin6_addr.s6_bytes, 16);
+
+  ReturnValue := IPEndpoint.FromData(Data, SizeOf(Data));
+
+  CheckFalse(ReturnValue.IsIPv6, 'Failed to set IPv6 address 1');
+  CheckTrue(ReturnValue.IsIPv6, 'Failed to set IPv6 address 2');
+  CheckEquals(ReturnValue.Address.AsIPv6, IPv6Address(Addr), 'Failed to set IPv6 address 3');
+  CheckEquals(Data.sin6_port, ReturnValue.Port, 'Failed to set port');
+end;
+
+procedure TestIPEndpoint.TestGetAddressIPv4;
+var
+  Addr: IPAddress;
+  Endp: IPEndpoint;
+  ReturnValue: IPAddress;
+begin
+  Addr := IPv4Address.Loopback;
+  Endp := Endpoint(Addr, 1042);
+
+  ReturnValue := Endp.Address;
+  CheckEquals(Addr, ReturnValue, 'Failed to get IPv4 address');
+end;
+
+procedure TestIPEndpoint.TestGetAddressIPv6;
+var
+  Addr: IPAddress;
+  Endp: IPEndpoint;
+  ReturnValue: IPAddress;
+begin
+  Addr := IPv6Address.Loopback;
+  Endp := Endpoint(Addr, 1042);
+
+  ReturnValue := Endp.Address;
+  CheckEquals(Addr, ReturnValue, 'Failed to get IPv6 address');
+end;
+
+procedure TestIPEndpoint.TestImplicitCast;
+var
+  Endp: IPEndpoint;
+  ReturnValue: string;
+begin
+  Endp := Endpoint(IPv4Address.Loopback, 1042);
+
+  ReturnValue := Endp;
+  CheckEquals('127.0.0.1:1042', ReturnValue, 'Failed to cast IPv4 endpoint');
+
+  Endp := Endpoint(IPv6Address.Loopback, 1042);
+
+  ReturnValue := Endp;
+  CheckEquals('[::1]:1042', ReturnValue, 'Failed to cast IPv6 endpoint');
+end;
+
+procedure TestIPEndpoint.TestSetAddressIPv4;
+var
+  Addr: IPAddress;
+  Endp: IPEndpoint;
+begin
+  Endp := Endpoint(IPAddressFamily.v6, 1234);
+  Addr := IPv4Address.Loopback;
+
+  Endp.Address := Addr;
+
+  CheckTrue(Endp.IsIPv4, 'Failed to set IPv4 address 1');
+  CheckFalse(Endp.IsIPv6, 'Failed to set IPv4 address 2');
+  CheckEquals(Addr, Endp.Address, 'Failed to set IPv4 address 3');
+end;
+
+procedure TestIPEndpoint.TestSetAddressIPv6;
+var
+  Addr: IPAddress;
+  Endp: IPEndpoint;
+begin
+  Endp := Endpoint(IPAddressFamily.v4, 1234);
+  Addr := IPv6Address.Loopback;
+
+  Endp.Address := Addr;
+
+  CheckTrue(Endp.IsIPv6, 'Failed to set IPv6 address 1');
+  CheckFalse(Endp.IsIPv6, 'Failed to set IPv6 address 2');
+  CheckEquals(Addr, Endp.Address, 'Failed to set IPv6 address 3');
 end;
 
 procedure TestIPSocket.SetUp;
@@ -422,12 +557,12 @@ begin
   // TODO: Validate method results
 end;
 
-
 initialization
   // Register any test cases with the test runner
   RegisterTest(TestIPv4Address.Suite);
   RegisterTest(TestIPv6Address.Suite);
   RegisterTest(TestIPAddress.Suite);
+  RegisterTest(TestIPEndpoint.Suite);
 //  RegisterTest(TestIPSocket.Suite);
 //  RegisterTest(TestIPStreamSocket.Suite);
 //  RegisterTest(TestAsyncSocketStream.Suite);
