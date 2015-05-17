@@ -1,0 +1,48 @@
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <ProjectGuid>{8660C5AD-C8D9-499D-B588-FC0D7B64BABA}</ProjectGuid>
+    </PropertyGroup>
+    <ItemGroup>
+        <Projects Include="tests\AsyncIODev.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="Test\AsyncIOTests.dproj">
+            <Dependencies/>
+        </Projects>
+    </ItemGroup>
+    <ProjectExtensions>
+        <Borland.Personality>Default.Personality.12</Borland.Personality>
+        <Borland.ProjectType/>
+        <BorlandProject>
+            <Default.Personality/>
+        </BorlandProject>
+    </ProjectExtensions>
+    <Target Name="AsyncIODev">
+        <MSBuild Projects="tests\AsyncIODev.dproj"/>
+    </Target>
+    <Target Name="AsyncIODev:Clean">
+        <MSBuild Projects="tests\AsyncIODev.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="AsyncIODev:Make">
+        <MSBuild Projects="tests\AsyncIODev.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="AsyncIOTests">
+        <MSBuild Projects="Test\AsyncIOTests.dproj"/>
+    </Target>
+    <Target Name="AsyncIOTests:Clean">
+        <MSBuild Projects="Test\AsyncIOTests.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="AsyncIOTests:Make">
+        <MSBuild Projects="Test\AsyncIOTests.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Build">
+        <CallTarget Targets="AsyncIODev;AsyncIOTests"/>
+    </Target>
+    <Target Name="Clean">
+        <CallTarget Targets="AsyncIODev:Clean;AsyncIOTests:Clean"/>
+    </Target>
+    <Target Name="Make">
+        <CallTarget Targets="AsyncIODev:Make;AsyncIOTests:Make"/>
+    </Target>
+    <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
+</Project>

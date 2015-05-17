@@ -17,3 +17,5 @@ __history
 *.dsm
 *.cbk
 *.stat
+TestInsightSettings.ini
+*.tvsconfig

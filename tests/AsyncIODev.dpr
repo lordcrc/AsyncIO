@@ -1,4 +1,4 @@
-program AsyncIOTest;
+program AsyncIODev;
 
 {$APPTYPE CONSOLE}
 

@@ -3,7 +3,7 @@
         <ProjectGuid>{40FC6AF9-DEC2-4EED-9B4C-71436F0D72B5}</ProjectGuid>
         <ProjectVersion>16.1</ProjectVersion>
         <FrameworkType>None</FrameworkType>
-        <MainSource>AsyncIOTest.dpr</MainSource>
+        <MainSource>AsyncIODev.dpr</MainSource>
         <Base>True</Base>
         <Config Condition="'$(Config)'==''">Debug</Config>
         <Platform Condition="'$(Platform)'==''">Win32</Platform>
@@ -44,7 +44,7 @@
         <DCC_UnitSearchPath>..\..\RegularExpr\;..\..\BufferedStreamReader;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
         <Manifest_File>None</Manifest_File>
         <VerInfo_Locale>1044</VerInfo_Locale>
-        <SanitizedProjectName>AsyncIOTest</SanitizedProjectName>
+        <SanitizedProjectName>AsyncIODev</SanitizedProjectName>
         <DCC_Namespace>System;Xml;Data;Datasnap;Web;Soap;$(DCC_Namespace)</DCC_Namespace>
         <DCC_DcuOutput>.\$(Platform)\$(Config)</DCC_DcuOutput>
         <DCC_ExeOutput>.\$(Platform)\$(Config)</DCC_ExeOutput>
@@ -125,7 +125,7 @@
         <BorlandProject>
             <Delphi.Personality>
                 <Source>
-                    <Source Name="MainSource">AsyncIOTest.dpr</Source>
+                    <Source Name="MainSource">AsyncIODev.dpr</Source>
                 </Source>
                 <Excluded_Packages>
                     <Excluded_Packages Name="$(BDSBIN)\dcloffice2k210.bpl">Microsoft Office 2000 Sample Automation Server Wrapper Components</Excluded_Packages>
@@ -133,9 +133,9 @@
                 </Excluded_Packages>
             </Delphi.Personality>
             <Deployment>
-                <DeployFile LocalName="Win32\Debug\AsyncIOTest.exe" Configuration="Debug" Class="ProjectOutput">
+                <DeployFile LocalName="Win32\Debug\AsyncIODev.exe" Configuration="Debug" Class="ProjectOutput">
                     <Platform Name="Win32">
-                        <RemoteName>AsyncIOTest.exe</RemoteName>
+                        <RemoteName>AsyncIODev.exe</RemoteName>
                         <Overwrite>true</Overwrite>
                     </Platform>
                 </DeployFile>
@@ -438,6 +438,9 @@
                 <Platform value="Win32">True</Platform>
                 <Platform value="Win64">False</Platform>
             </Platforms>
+            <UnitTesting>
+                <TestProjectName>C:\Users\LordCrc\Documents\Embarcadero\Studio\Projects\AsyncIO\Test\AsyncIOTests.dproj</TestProjectName>
+            </UnitTesting>
         </BorlandProject>
         <ProjectFileVersion>12</ProjectFileVersion>
     </ProjectExtensions>
