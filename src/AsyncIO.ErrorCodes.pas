@@ -27,7 +27,7 @@ type
     function GetValue: DWORD;
   public
     class function Create(const ErrorCode: DWORD): IOErrorCode; overload; static;
-    class function Create(): IOErrorCode; overload; static; // from last error
+    class function FromLastError(): IOErrorCode; overload; static; // from last error
 
     property Message: string read GetMessage;
     property Value: DWORD read GetValue;
@@ -70,11 +70,6 @@ begin
   result.FErrorCode := ErrorCode;
 end;
 
-class function IOErrorCode.Create: IOErrorCode;
-begin
-  result := Create(GetLastError);
-end;
-
 class function IOErrorCode.EndOfFile: IOErrorCode;
 begin
   result := IOErrorCode.Create(ERROR_HANDLE_EOF);
@@ -83,6 +78,11 @@ end;
 class operator IOErrorCode.Equal(const A, B: IOErrorCode): boolean;
 begin
   result := A.FErrorCode = B.FErrorCode;
+end;
+
+class function IOErrorCode.FromLastError: IOErrorCode;
+begin
+  result := Create(GetLastError);
 end;
 
 function IOErrorCode.GetMessage: string;

@@ -330,7 +330,7 @@ begin
   end
   else
   begin
-    ec := IOErrorCode.Create();
+    ec := IOErrorCode.FromLastError();
     if Assigned(overlapped) then
     begin
       // failed IO operation, trigger handler

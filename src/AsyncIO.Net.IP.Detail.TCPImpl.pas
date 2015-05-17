@@ -85,7 +85,7 @@ begin
         err := IdWinsock2.setsockopt(SocketHandle, SOL_SOCKET, SO_UPDATE_CONNECT_CONTEXT, nil, 0);
         if (err <> 0) then
           // set code from GetLastError
-          ec := IOErrorCode.Create();
+          ec := IOErrorCode.FromLastError();
       end;
 
       // if connect succeeded but setsockopt failed, pass the error from the latter
