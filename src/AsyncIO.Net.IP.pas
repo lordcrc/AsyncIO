@@ -1110,6 +1110,9 @@ begin
 
     addr := PAddressInfo(addr.ai_next);
   end;
+
+  // possibly down-size
+  SetLength(result.FResults, i);
 end;
 
 function IPResolver.Results.GetEnumerator: IPResolver.Results.TResultsEnumerator;
