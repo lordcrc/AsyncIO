@@ -109,12 +109,14 @@ type
     FValue: UInt16;
   public
     class operator Implicit(const Family: IPAddressFamily): UInt16; inline;
-    class operator Equal(const A, B: IPAddressFamily): boolean; inline;
-    class operator NotEqual(const A, B: IPAddressFamily): boolean; inline;
+    class operator Equal(const Family1, Family2: IPAddressFamily): boolean; inline;
+    class operator NotEqual(const Family1, Family2: IPAddressFamily): boolean; inline;
 
     class function Unspecified: IPAddressFamily; static;
     class function v4: IPAddressFamily; static;
     class function v6: IPAddressFamily; static;
+
+    function ToString(): string;
   end;
 
   IPEndpoint = record
@@ -134,7 +136,9 @@ type
     class function Create(const SocketAddress6: PSockAddrIn6; const AddressLength: NativeUInt): IPEndpoint; overload; static;
   public
     class operator Implicit(const Endpoint: IPEndpoint): string;
-
+    class operator Equal(const Endpoint1, Endpoint2: IPEndpoint): boolean;
+    class operator NotEqual(const Endpoint1, Endpoint2: IPEndpoint): boolean;
+    
     class function FromData(const Data; const DataLength: integer): IPEndpoint; static;
 
     property Address: IPAddress read GetAddress write SetAddress;
@@ -184,6 +188,11 @@ type
     class function TCP: TCPProtocol; static;
     class function UDP: UDPProtocol; static;
     class function Unspecified: IPProtocol; static;
+
+    class operator Equal(const Protocol1, Protocol2: IPProtocol): boolean;
+    class operator NotEqual(const Protocol1, Protocol2: IPProtocol): boolean;
+
+    function ToString(): string;
 
     property Family: IPAddressFamily read FFamily;
     property SocketType: integer read FSocketType;
@@ -252,9 +261,8 @@ type
             FIndex: integer;
           private
             function GetCurrent: Entry;
-          public
             constructor Create(const Results: TArray<Entry>);
-
+          public
             function MoveNext: boolean;
 
             property Current: Entry read GetCurrent;
@@ -265,12 +273,14 @@ type
         class function Create(const Host, Service: string; const AddressInfo: PAddressInfo): Results; static;
       public
         function GetEnumerator: TResultsEnumerator;
+
+        function ToArray(): TArray<Entry>;
      end;
   public
     class function Resolve(const ResolveQuery: Query): Results; static;
   end;
 
-function Query(const Protocol: IPProtocol; const Host, Service: string; const Flags: ResolveFlags = [ResolveAddressConfigured]): IPResolver.Query; inline; overload;
+function Query(const Protocol: IPProtocol; const Host, Service: string; const Flags: ResolveFlags = [ResolveAddressConfigured]): IPResolver.Query; {TODO - remove when compiler bug is fixed... inline;} overload;
 function Query(const Host, Service: string; const Flags: ResolveFlags = [ResolveAddressConfigured]): IPResolver.Query; inline; overload;
 
 
@@ -704,9 +714,9 @@ end;
 
 { IPAddressFamily }
 
-class operator IPAddressFamily.Equal(const A, B: IPAddressFamily): boolean;
+class operator IPAddressFamily.Equal(const Family1, Family2: IPAddressFamily): boolean;
 begin
-  result := A.FValue = B.FValue;
+  result := Family1.FValue = Family2.FValue;
 end;
 
 class operator IPAddressFamily.Implicit(const Family: IPAddressFamily): UInt16;
@@ -714,9 +724,20 @@ begin
   result := Family.FValue;
 end;
 
-class operator IPAddressFamily.NotEqual(const A, B: IPAddressFamily): boolean;
+class operator IPAddressFamily.NotEqual(const Family1, Family2: IPAddressFamily): boolean;
 begin
-  result := A.FValue <> B.FValue;
+  result := Family1.FValue <> Family2.FValue;
+end;
+
+function IPAddressFamily.ToString: string;
+begin
+  case FValue of
+    AF_UNSPEC: result := 'Unspecified';
+    AF_INET: result := 'IPv4';
+    AF_INET6: result := 'IPv6';
+  else
+    raise EInvalidArgument.CreateFmt('IPAddressFamily.ToString: Unknown address family %d', [FValue]);
+  end;
 end;
 
 class function IPAddressFamily.Unspecified: IPAddressFamily;
@@ -798,19 +819,29 @@ begin
   Move(SocketAddress6^, result.Fv6, Min(AddressLength, SizeOf(result.Fv6)));
 end;
 
+class operator IPEndpoint.Equal(const Endpoint1, Endpoint2: IPEndpoint): boolean;
+begin
+  result :=
+    (Endpoint1.Address = Endpoint2.Address) and
+    (Endpoint1.Port = Endpoint2.Port);
+end;
+
 class function IPEndpoint.FromData(const Data;
   const DataLength: integer): IPEndpoint;
+var
+  family: integer;
 begin
   if DataLength < SizeOf(result.Fv4) then
     raise EArgumentException.Create('IPEndpoint.FromData: Unknown socket address type');
 
   // if data is at least as larger as SockAddrIn, we'll just assume
   // it contains at least the family identifier
-  case PSockAddrIn(@Data)^.sin_family of
+  family := PSockAddrIn(@Data)^.sin_family;
+  case family of
     AF_INET: result := IPEndpoint.Create(PSockAddrIn(@Data), DataLength);
     AF_INET6: result := IPEndpoint.Create(PSockAddrIn6(@Data), DataLength);
   else
-    raise EArgumentException.Create('IPEndpoint.FromData: Unknown address family');
+    raise EArgumentException.CreateFmt('IPEndpoint.FromData: Unknown address family %d', [family]);
   end;
 end;
 
@@ -877,6 +908,11 @@ begin
   result := result + ':' + IntToStr(Endpoint.Port);
 end;
 
+class operator IPEndpoint.NotEqual(const Endpoint1, Endpoint2: IPEndpoint): boolean;
+begin
+  result := not (Endpoint1 = Endpoint2);
+end;
+
 procedure IPEndpoint.SetAddress(const Value: IPAddress);
 var
   addrV6: IPv6Address;
@@ -913,14 +949,40 @@ end;
 
 { IPProtocol }
 
+class operator IPProtocol.Equal(const Protocol1, Protocol2: IPProtocol): boolean;
+begin
+  result :=
+    (Protocol1.Protocol = Protocol2.Protocol) and
+    (Protocol1.SocketType = Protocol2.SocketType) and
+    (Protocol1.Family = Protocol2.Family);
+end;
+
 class function IPProtocol.ICMP: ICMPProtocol;
 begin
   // just a helper
 end;
 
+class operator IPProtocol.NotEqual(const Protocol1, Protocol2: IPProtocol): boolean;
+begin
+  result := not (Protocol1 = Protocol2);
+end;
+
 class function IPProtocol.TCP: TCPProtocol;
 begin
   // just a helper
+end;
+
+function IPProtocol.ToString: string;
+begin
+  case FProtocol of
+    IPPROTO_IP: result := 'IP';
+    IPPROTO_ICMP: result := 'ICMP';
+    IPPROTO_TCP: result := 'TCP';
+    IPPROTO_UDP: result := 'UDP';
+  else
+    raise EInvalidArgument.CreateFmt('IPProtocol.ToString: Unknown protocol %d', [FProtocol]);
+  end;
+  result := result + '/' + Family.ToString;
 end;
 
 class function IPProtocol.UDP: UDPProtocol;
@@ -1009,7 +1071,7 @@ begin
   result := IPResolver.Query.Create(Protocol, Host, Service, Flags);
 end;
 
-function Query(const Host, Service: string; const Flags: ResolveFlags = [ResolveAddressConfigured]): IPResolver.Query; inline;
+function Query(const Host, Service: string; const Flags: ResolveFlags): IPResolver.Query; inline;
 begin
   result := IPResolver.Query.Create(IPProtocol.Unspecified, Host, Service, Flags);
 end;
@@ -1145,6 +1207,11 @@ begin
   result := TResultsEnumerator.Create(FResults);
 end;
 
+function IPResolver.Results.ToArray: TArray<Entry>;
+begin
+  result := Copy(FResults);
+end;
+
 { IPResolver }
 
 class function IPResolver.Resolve(const ResolveQuery: Query): Results;
@@ -1171,9 +1238,11 @@ begin
     nil,
     nil);
 
-  result := Results.Create(ResolveQuery.HostName, ResolveQuery.ServiceName, addr);
-
-  FreeAddrInfoEx(PADDRINFOEXA(addr));
+  try
+    result := Results.Create(ResolveQuery.HostName, ResolveQuery.ServiceName, addr);
+  finally
+    FreeAddrInfoEx(PADDRINFOEXA(addr));
+  end;
 end;
 
 function NewTCPSocket(const Service: IOService): IPStreamSocket;
