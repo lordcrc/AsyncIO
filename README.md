@@ -141,3 +141,6 @@ Sending echo request
 Echo reply: "Hello Internet!"
 ```
 
+## License
+
+Licensed under the Apache 2.0 license, see LICENSE file for details.
