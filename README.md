@@ -37,7 +37,7 @@ var
   client: EchoClient;
   r: Int64;
 begin
-  qry := Query(IPProtocol.TCPProtocol.v6, 'localhost', '7', [ResolveAllMatching]);
+  qry := Query(IPProtocol.TCP.v6, 'localhost', '7', [ResolveAllMatching]);
   res := IPResolver.Resolve(qry);
 
   ip := res[0]; // TODO - make connect take resolver result set, connect until success
