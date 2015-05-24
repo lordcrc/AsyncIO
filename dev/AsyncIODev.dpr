@@ -27,8 +27,8 @@ begin
   try
 //    RunBasicTest;
 //    RunCopyTest;
-//    RunSocketTest;
-    RunStreamReaderTest;
+    RunSocketTest;
+//    RunStreamReaderTest;
   except
     on E: Exception do
       Writeln(E.ClassName, ': ', E.Message);

@@ -127,9 +127,9 @@ procedure RunSocketTest;
 begin
 //  TestAddress;
 //  TestEndpoint;
-//  TestResolve;
+  TestResolve;
 
-  TestEcho;
+//  TestEcho;
 end;
 
 { EchoClient }

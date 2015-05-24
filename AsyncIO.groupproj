@@ -3,7 +3,7 @@
         <ProjectGuid>{8660C5AD-C8D9-499D-B588-FC0D7B64BABA}</ProjectGuid>
     </PropertyGroup>
     <ItemGroup>
-        <Projects Include="tests\AsyncIODev.dproj">
+        <Projects Include="dev\AsyncIODev.dproj">
             <Dependencies/>
         </Projects>
         <Projects Include="Test\AsyncIOTests.dproj">
@@ -18,13 +18,13 @@
         </BorlandProject>
     </ProjectExtensions>
     <Target Name="AsyncIODev">
-        <MSBuild Projects="tests\AsyncIODev.dproj"/>
+        <MSBuild Projects="dev\AsyncIODev.dproj"/>
     </Target>
     <Target Name="AsyncIODev:Clean">
-        <MSBuild Projects="tests\AsyncIODev.dproj" Targets="Clean"/>
+        <MSBuild Projects="dev\AsyncIODev.dproj" Targets="Clean"/>
     </Target>
     <Target Name="AsyncIODev:Make">
-        <MSBuild Projects="tests\AsyncIODev.dproj" Targets="Make"/>
+        <MSBuild Projects="dev\AsyncIODev.dproj" Targets="Make"/>
     </Target>
     <Target Name="AsyncIOTests">
         <MSBuild Projects="Test\AsyncIOTests.dproj"/>
