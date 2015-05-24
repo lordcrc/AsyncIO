@@ -133,11 +133,11 @@ end;
 
 Output from the above program:
 ```
-    Connecting to [::1]:7
-    Client connected
-    Local endpoint: [::1]:61659
-    Remote endpoint: [::1]:7
-    Sending echo request
-    Echo reply: "Hello Internet!"
+Connecting to [::1]:7
+Client connected
+Local endpoint: [::1]:61659
+Remote endpoint: [::1]:7
+Sending echo request
+Echo reply: "Hello Internet!"
 ```
 
