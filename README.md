@@ -139,6 +139,8 @@ Local endpoint: [::1]:61659
 Remote endpoint: [::1]:7
 Sending echo request
 Echo reply: "Hello Internet!"
+
+Done
 ```
 
 ## License
