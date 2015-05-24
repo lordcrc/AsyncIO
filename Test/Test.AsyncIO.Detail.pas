@@ -276,6 +276,7 @@ procedure TestIOServiceImpl.TestAssociateHandle;
 var
   Handle: THandle;
 begin
+  Handle := INVALID_HANDLE_VALUE;
   try
     Handle := CreateFile('testfile', GENERIC_READ, FILE_SHARE_READ or FILE_SHARE_WRITE, nil, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL or FILE_FLAG_OVERLAPPED, 0);
 
