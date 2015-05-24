@@ -98,7 +98,7 @@ var
   client: EchoClient;
   r: Int64;
 begin
-  qry := Query(IPProtocol.TCPProtocol.v6, 'localhost', '7', [ResolveAllMatching]);
+  qry := Query(IPProtocol.TCP.v6, 'localhost', '7', [ResolveAllMatching]);
   res := IPResolver.Resolve(qry);
 
   for ip in res do
@@ -117,6 +117,7 @@ begin
     r := ios.Run;
 
     WriteLn;
+    WriteLn('Done');
     WriteLn(Format('%d handlers executed', [r]));
   finally
     client.Free;
@@ -127,9 +128,9 @@ procedure RunSocketTest;
 begin
 //  TestAddress;
 //  TestEndpoint;
-  TestResolve;
+//  TestResolve;
 
-//  TestEcho;
+  TestEcho;
 end;
 
 { EchoClient }
@@ -139,7 +140,7 @@ begin
   if (not ErrorCode) then
     RaiseLastOSError(ErrorCode.Value);
 
-  WriteLn('Connected');
+  WriteLn('Client connected');
   WriteLn('Local endpoint: ' + FSocket.LocalEndpoint);
   WriteLn('Remote endpoint: ' + FSocket.RemoteEndpoint);
   WriteLn('Sending echo request');
