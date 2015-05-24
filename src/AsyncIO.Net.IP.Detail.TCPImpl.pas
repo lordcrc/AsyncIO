@@ -167,6 +167,16 @@ procedure TTCPSocketImpl.Bind(const LocalEndpoint: IPEndpoint);
 var
   res: WinsockResult;
 begin
+  if (LocalEndpoint.IsIPv4) then
+    FProtocol := IPProtocol.TCP.v4
+  else if (LocalEndpoint.IsIPv6) then
+    FProtocol := IPProtocol.TCP.v6
+  else
+    FProtocol := IPProtocol.TCP.Unspecified;
+
+  if not SocketInitialized then
+    CreateSocket;
+
   res := IdWinsock2.bind(SocketHandle, LocalEndpoint.Data, LocalEndpoint.DataLength);
 end;
 
@@ -244,12 +254,7 @@ end;
 
 function TTCPSocketImpl.GetProtocol: IPProtocol;
 begin
-  if (GetLocalEndpoint.IsIPv4) then
-    FProtocol := IPProtocol.TCP.v4
-  else if (GetLocalEndpoint.IsIPv6) then
-    FProtocol := IPProtocol.TCP.v6
-  else
-    FProtocol := IPProtocol.TCP.Unspecified;
+  result := FProtocol;
 end;
 
 function TTCPSocketImpl.GetRemoteEndpoint: IPEndpoint;
