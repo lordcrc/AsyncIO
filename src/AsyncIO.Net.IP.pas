@@ -775,6 +775,7 @@ end;
 class function IPEndpoint.Create(const Family: IPAddressFamily;
   const Port: UInt16): IPEndpoint;
 begin
+  FillChar(result, SizeOf(result), 0);
   if (Family = IPAddressFamily.v4) then
   begin
     result.Fv4.sin_family := IPAddressFamily.v4;
@@ -785,15 +786,17 @@ begin
   begin
     result.Fv6.sin6_family := IPAddressFamily.v6;
     result.Fv6.sin6_port := htons(Port);
-    result.Fv6.sin6_flowinfo := 0;
-    FillChar(result.Fv6.sin6_addr.s6_bytes[0], 16, 0);
-    result.Fv6.sin6_scope_id := 0;
+    // zeroed above so no need to do it again
+    //result.Fv6.sin6_flowinfo := 0;
+    //FillChar(result.Fv6.sin6_addr.s6_bytes[0], 16, 0);
+    //result.Fv6.sin6_scope_id := 0;
   end;
 end;
 
 class function IPEndpoint.Create(const Address: IPAddress;
   const Port: UInt16): IPEndpoint;
 begin
+  FillChar(result, SizeOf(result), 0);
   result.Address := Address;
   result.Port := Port;
 end;
@@ -804,6 +807,7 @@ begin
   if (AddressLength < SizeOf(result.Fv4)) then
     raise EArgumentException.Create('IPEndpoint.Create: Unknown socket address type');
 
+  FillChar(result, SizeOf(result), 0);
   Move(SocketAddress4^, result.Fv4, SizeOf(result.Fv4));
 end;
 
@@ -813,9 +817,7 @@ begin
   if (AddressLength < SizeOf(TSockAddrIn6)) then
     raise EArgumentException.Create('IPEndpoint.Create: Unknown socket address type');
 
-  if (AddressLength < SizeOf(result.Fv6)) then
-    FillChar(result.Fv6, SizeOf(result.Fv6), 0);
-
+  FillChar(result, SizeOf(result), 0);
   Move(SocketAddress6^, result.Fv6, Min(AddressLength, SizeOf(result.Fv6)));
 end;
 
