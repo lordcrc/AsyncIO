@@ -126,7 +126,7 @@ end;
 
 procedure TEchoTestServerImpl.Start;
 begin
-  FServer.StartListening;
+  FServer.Active := True;
 
   // Give the server threads some time to start listening
   Sleep(100);
@@ -134,8 +134,7 @@ end;
 
 procedure TEchoTestServerImpl.Stop;
 begin
-  FServer.StopListening;
-  FServer.TerminateAllThreads;
+  FServer.Active := False;
 end;
 
 end.
