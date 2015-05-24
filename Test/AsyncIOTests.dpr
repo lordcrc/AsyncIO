@@ -35,7 +35,11 @@ uses
   BufStreamReader in '..\..\BufferedStreamReader\BufStreamReader.pas',
   EncodingHelper in '..\..\BufferedStreamReader\EncodingHelper.pas',
   Test.AsyncIO.Net.IP in 'Test.AsyncIO.Net.IP.pas',
-  NetTestCase in 'NetTestCase.pas';
+  NetTestCase in 'NetTestCase.pas',
+  Test.AsyncIO.Net.IP.Detail.TCPImpl in 'Test.AsyncIO.Net.IP.Detail.TCPImpl.pas',
+  Test.AsyncIO.Net.IP.Detail in 'Test.AsyncIO.Net.IP.Detail.pas',
+  IPStreamSocketMock in 'IPStreamSocketMock.pas',
+  EchoTestServer in 'EchoTestServer.pas';
 
 {$R *.RES}
 
