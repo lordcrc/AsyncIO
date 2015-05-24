@@ -45,7 +45,7 @@ type
 implementation
 
 uses
-  System.SysUtils;
+  System.SysUtils, AsyncIO.ErrorCodes;
 
 procedure TestTTCPSocketImpl.SetUp;
 begin
@@ -109,11 +109,11 @@ procedure TestTTCPSocketImpl.TestGetLocalEndpoint;
 var
   ReturnValue: IPEndpoint;
 begin
-  StartExpectingException(EOSError);
-
-  ReturnValue := FTCPSocketImpl.GetLocalEndpoint;
-
-  StopExpectingException('Failed to raise OS error for unbound socket');
+  try
+    ReturnValue := FTCPSocketImpl.GetLocalEndpoint;
+  except
+    on E: Exception do CheckIs(E, EOSError, 'Failed to raise OS error for unbound socket');
+  end;
 
   FTCPSocketImpl.Bind(Endpoint(IPv4Address.Loopback, 0));
 
@@ -124,81 +124,245 @@ end;
 
 procedure TestTTCPSocketImpl.TestGetRemoteEndpoint;
 var
-  ServerEndpoint: IPEndpoint;
+  PeerEndpoint: IPEndpoint;
   ReturnValue: IPEndpoint;
 begin
   FTestServer.Start;
 
-  ServerEndpoint := Endpoint(IPv4Address.Loopback, FTestServer.Port);
+  PeerEndpoint := Endpoint(IPv4Address.Loopback, FTestServer.Port);
 
-  FTCPSocketImpl.Connect(ServerEndpoint);
+  FTCPSocketImpl.Connect(PeerEndpoint);
 
   ReturnValue := FTCPSocketImpl.GetRemoteEndpoint;
 
-  CheckEquals(ServerEndpoint, ReturnValue);
+  CheckEquals(PeerEndpoint, ReturnValue);
 end;
 
 procedure TestTTCPSocketImpl.TestAsyncConnect;
 var
   Handler: OpHandler;
   PeerEndpoint: IPEndpoint;
+  HandlerExecuted: boolean;
 begin
-  // TODO: Setup method call parameters
-//  FTCPSocketImpl.AsyncConnect(PeerEndpoint, Handler);
-  // TODO: Validate method results
+  FTestServer.Start;
+
+  PeerEndpoint := Endpoint(IPv4Address.Loopback, FTestServer.Port);
+
+  HandlerExecuted := False;
+  Handler :=
+    procedure(const ErrorCode: IOErrorCode)
+    begin
+      HandlerExecuted := True;
+      CheckEquals(IOErrorCode.Success, ErrorCode, 'AsyncConnect failed');
+    end;
+
+  FTCPSocketImpl.AsyncConnect(PeerEndpoint, Handler);
+
+  FService.Poll;
+
+  CheckTrue(HandlerExecuted, 'Failed to execute connect handler');
 end;
 
 procedure TestTTCPSocketImpl.TestBind;
 var
   LocalEndpoint: IPEndpoint;
 begin
-  // TODO: Setup method call parameters
-//  FTCPSocketImpl.Bind(LocalEndpoint);
-  // TODO: Validate method results
+  LocalEndpoint := Endpoint(IPAddressFamily.v4, 0);
+
+  FTCPSocketImpl.Bind(LocalEndpoint);
+
+  CheckEquals(IPProtocol.TCP.v4, FTCPSocketImpl.GetProtocol);
+
+  StartExpectingException(EOSError);
+
+  LocalEndpoint := Endpoint(IPAddressFamily.v6, 0);
+
+  FTCPSocketImpl.Bind(LocalEndpoint);
+
+  StopExpectingException('Failed to raise error on double-bind');
 end;
 
 procedure TestTTCPSocketImpl.TestConnect;
 var
   PeerEndpoint: IPEndpoint;
+  ReturnValue: IPEndpoint;
 begin
-  // TODO: Setup method call parameters
-//  FTCPSocketImpl.Connect(PeerEndpoint);
-  // TODO: Validate method results
+  FTestServer.Start;
+
+  PeerEndpoint := Endpoint(IPv4Address.Loopback, FTestServer.Port);
+
+  FTCPSocketImpl.Connect(PeerEndpoint);
+
+  CheckEquals(PeerEndpoint, FTCPSocketImpl.RemoteEndpoint);
+
+  StartExpectingException(EOSError);
+
+  PeerEndpoint := Endpoint(IPv6Address.Loopback, FTestServer.Port);
+  FTCPSocketImpl.Connect(PeerEndpoint);
+
+  StopExpectingException('Failed to raise error on double-connect');
 end;
 
 procedure TestTTCPSocketImpl.TestClose;
+var
+  PeerEndpoint: IPEndpoint;
+  ReturnValue: IPEndpoint;
 begin
-//  FTCPSocketImpl.Close;
-  // TODO: Validate method results
+  FTestServer.Start;
+
+  PeerEndpoint := Endpoint(IPv4Address.Loopback, FTestServer.Port);
+
+  FTCPSocketImpl.Connect(PeerEndpoint);
+
+  FTCPSocketImpl.Close;
+
+  PeerEndpoint := Endpoint(IPv4Address.Loopback, FTestServer.Port);
+  FTCPSocketImpl.Connect(PeerEndpoint);
+
+  CheckEquals(PeerEndpoint, FTCPSocketImpl.RemoteEndpoint);
 end;
 
 procedure TestTTCPSocketImpl.TestShutdown;
 var
+  PeerEndpoint: IPEndpoint;
   ShutdownFlag: SocketShutdownFlag;
+  Data: TBytes;
+  Handler: IOHandler;
+  HandlerExecuted: boolean;
 begin
-  // TODO: Setup method call parameters
-//  FTCPSocketImpl.Shutdown(ShutdownFlag);
-  // TODO: Validate method results
+  SetLength(Data, 42);
+
+  FTestServer.Start;
+
+  PeerEndpoint := Endpoint(IPv4Address.Loopback, FTestServer.Port);
+
+  FTCPSocketImpl.Connect(PeerEndpoint);
+
+
+  FTCPSocketImpl.Shutdown(SocketShutdownWrite);
+
+  HandlerExecuted := False;
+  Handler :=
+    procedure(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64)
+    begin
+      HandlerExecuted := True;
+    end;
+
+  try
+    FTCPSocketImpl.AsyncSend(Data, Handler);
+  except
+    on E: Exception do CheckIs(E, EOSError, 'Failed to shutdown write 1');
+  end;
+
+  FService.Poll;
+
+  CheckFalse(HandlerExecuted, 'Failed to shutdown write 2');
+
+
+  FTCPSocketImpl.Shutdown(SocketShutdownRead);
+
+  HandlerExecuted := False;
+  Handler :=
+    procedure(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64)
+    begin
+      HandlerExecuted := True;
+    end;
+
+
+  try
+    FTCPSocketImpl.AsyncReceive(Data, Handler);
+  except
+    on E: Exception do CheckIs(E, EOSError, 'Failed to shutdown read 1');
+  end;
+
+  FService.Poll;
+
+  CheckFalse(HandlerExecuted, 'Failed to shutdown read 2');
 end;
 
 procedure TestTTCPSocketImpl.TestAsyncSend;
 var
+  Data: TBytes;
+  PeerEndpoint: IPEndpoint;
   Handler: IOHandler;
   Buffer: MemoryBuffer;
+  HandlerExecuted: boolean;
 begin
-  // TODO: Setup method call parameters
-//  FTCPSocketImpl.AsyncSend(Buffer, Handler);
-  // TODO: Validate method results
+  SetLength(Data, 42);
+
+  FTestServer.Start;
+
+  PeerEndpoint := Endpoint(IPv4Address.Loopback, FTestServer.Port);
+
+  FTCPSocketImpl.Connect(PeerEndpoint);
+
+  HandlerExecuted := False;
+  Handler :=
+    procedure(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64)
+    begin
+      HandlerExecuted := True;
+      CheckEquals(IOErrorCode.Success, ErrorCode, 'Failed to write data');
+      CheckEquals(Length(Data), BytesTransferred, 'Failed to write all data');
+    end;
+
+  FTCPSocketImpl.AsyncSend(Data, Handler);
+
+  FService.RunOne;
+
+  CheckTrue(HandlerExecuted, 'Failed to execute write handler');
 end;
 
 procedure TestTTCPSocketImpl.TestAsyncReceive;
 var
+  SrcData: TBytes;
+  RecvData: TBytes;
+  PeerEndpoint: IPEndpoint;
   Handler: IOHandler;
   Buffer: MemoryBuffer;
+  HandlerExecuted: boolean;
 begin
-  // TODO: Setup method call parameters
-//  FTCPSocketImpl.AsyncReceive(Buffer, Handler);
-  // TODO: Validate method results
+  SrcData := GenerateData(42);
+
+  FTestServer.Start;
+
+  PeerEndpoint := Endpoint(IPv4Address.Loopback, FTestServer.Port);
+
+  FTCPSocketImpl.Connect(PeerEndpoint);
+
+  HandlerExecuted := False;
+  Handler :=
+    procedure(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64)
+    begin
+      HandlerExecuted := True;
+      CheckEquals(IOErrorCode.Success, ErrorCode, 'Failed to write data');
+      CheckEquals(Length(SrcData), BytesTransferred, 'Failed to write all data');
+    end;
+
+  FTCPSocketImpl.AsyncSend(SrcData, Handler);
+
+  FService.RunOne;
+
+  CheckTrue(HandlerExecuted, 'Failed to execute write handler');
+
+  SetLength(RecvData, Length(SrcData));
+
+  // now do actual receive test
+  HandlerExecuted := False;
+  Handler :=
+    procedure(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64)
+    begin
+      HandlerExecuted := True;
+      CheckEquals(IOErrorCode.Success, ErrorCode, 'Failed to read data');
+      CheckEquals(Length(RecvData), BytesTransferred, 'Failed to read all data');
+    end;
+
+  FTCPSocketImpl.AsyncReceive(RecvData, Handler);
+
+  FService.RunOne;
+
+  CheckTrue(HandlerExecuted, 'Failed to execute read handler');
+
+  CheckEqualsMem(SrcData, RecvData, Length(SrcData), 'Read data does not match written data');
 end;
 
 initialization
