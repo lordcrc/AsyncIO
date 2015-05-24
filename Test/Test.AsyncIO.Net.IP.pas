@@ -71,6 +71,18 @@ type
   end;
   // Test methods for class IPSocket
 
+  TestIPResolver = class(TNetTestCase)
+  strict private
+  public
+    procedure SetUp; override;
+    procedure TearDown; override;
+  published
+    procedure TestResolveBasic;
+    procedure TestResolveIPv4;
+    procedure TestResolveIPv6;
+  end;
+  // Test methods for class IPSocket
+
   TestIPSocket = class(TNetTestCase)
   strict private
     FIPSocket: IPSocket;
@@ -416,6 +428,55 @@ begin
   CheckEquals(Addr, Endp.Address, 'Failed to set IPv6 address 3');
 end;
 
+procedure TestIPResolver.SetUp;
+begin
+
+end;
+
+procedure TestIPResolver.TearDown;
+begin
+
+end;
+
+procedure TestIPResolver.TestResolveBasic;
+var
+  ReturnValue: IPResolver.Results;
+begin
+  ReturnValue := IPResolver.Resolve(Query('localhost', ''));
+
+  CheckTrue(Length(ReturnValue.ToArray()) > 0, 'Failed to resolve localhost');
+end;
+
+procedure TestIPResolver.TestResolveIPv4;
+var
+  ReturnValue: IPResolver.Results;
+  Entries: TArray<IPResolver.Entry>;
+begin
+  ReturnValue := IPResolver.Resolve(Query(IPProtocol.TCP.v4, 'localhost', ''));
+
+  Entries := ReturnValue.ToArray();
+
+  CheckTrue(Length(Entries) > 0, 'Failed to resolve IPv4 localhost 1');
+  CheckEquals(IPv4Address.Loopback, Entries[0].Endpoint.Address.AsIPv4, 'Failed to resolve IPv4 loopback 2');
+  CheckEquals('localhost', Entries[0].HostName, 'Failed to resolve IPv4 loopback 3');
+  CheckEquals('', Entries[0].ServiceName, 'Failed to resolve IPv4 loopback 4');
+end;
+
+procedure TestIPResolver.TestResolveIPv6;
+var
+  ReturnValue: IPResolver.Results;
+  Entries: TArray<IPResolver.Entry>;
+begin
+  ReturnValue := IPResolver.Resolve(Query(IPProtocol.TCP.v6, 'localhost', ''));
+
+  Entries := ReturnValue.ToArray();
+
+  CheckTrue(Length(Entries) > 0, 'Failed to resolve IPv6 localhost 1');
+  CheckEquals(IPv6Address.Loopback, Entries[0].Endpoint.Address.AsIPv6, 'Failed to resolve IPv6 loopback 2');
+  CheckEquals('localhost', Entries[0].HostName, 'Failed to resolve IPv6 loopback 3');
+  CheckEquals('', Entries[0].ServiceName, 'Failed to resolve IPv6 loopback 4');
+end;
+
 procedure TestIPSocket.SetUp;
 begin
   // TODO: Initialize FIPSocket
@@ -563,6 +624,7 @@ initialization
   RegisterTest(TestIPv6Address.Suite);
   RegisterTest(TestIPAddress.Suite);
   RegisterTest(TestIPEndpoint.Suite);
+  RegisterTest(TestIPResolver.Suite);
 //  RegisterTest(TestIPSocket.Suite);
 //  RegisterTest(TestIPStreamSocket.Suite);
 //  RegisterTest(TestAsyncSocketStream.Suite);
