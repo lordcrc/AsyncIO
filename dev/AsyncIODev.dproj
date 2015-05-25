@@ -41,12 +41,11 @@
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base)'!=''">
         <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
-        <DCC_UnitSearchPath>..\..\RegularExpr\;..\..\BufferedStreamReader;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
-        <Manifest_File>None</Manifest_File>
+        <Manifest_File>$(BDS)\bin\default_app.manifest</Manifest_File>
         <VerInfo_Locale>1044</VerInfo_Locale>
         <SanitizedProjectName>AsyncIODev</SanitizedProjectName>
         <DCC_Namespace>System;Xml;Data;Datasnap;Web;Soap;$(DCC_Namespace)</DCC_Namespace>
-        <DCC_DcuOutput>.\$(Platform)\$(Config)</DCC_DcuOutput>
+        <DCC_DcuOutput>.\dcu</DCC_DcuOutput>
         <DCC_ExeOutput>.\$(Platform)\$(Config)</DCC_ExeOutput>
         <DCC_E>false</DCC_E>
         <DCC_N>false</DCC_N>
@@ -92,21 +91,26 @@
         <DelphiCompile Include="$(MainSource)">
             <MainSource>MainSource</MainSource>
         </DelphiCompile>
-        <DCCReference Include="..\src\AsyncIO.ErrorCodes.pas"/>
-        <DCCReference Include="..\src\AsyncIO.pas"/>
-        <DCCReference Include="..\src\AsyncIO.Detail.pas"/>
-        <DCCReference Include="..\src\AsyncIO.Filesystem.pas"/>
-        <DCCReference Include="..\src\AsyncIO.Filesystem.Detail.pas"/>
-        <DCCReference Include="..\src\AsyncIO.Net.IP.pas"/>
-        <DCCReference Include="..\src\AsyncIO.Net.IP.Detail.pas"/>
-        <DCCReference Include="..\src\AsyncIO.Net.IP.Detail.TCPImpl.pas"/>
-        <DCCReference Include="..\src\AsyncIO.StreamReader.pas"/>
         <DCCReference Include="AsyncIO.Test.Basic.pas"/>
         <DCCReference Include="AsyncIO.Test.Copy.pas"/>
         <DCCReference Include="AsyncIO.Test.Socket.pas"/>
         <DCCReference Include="AsyncIO.Test.StreamReader.pas"/>
-        <DCCReference Include="..\src\AsyncIO.Detail.StreamBufferImpl.pas"/>
         <DCCReference Include="AsyncIO.Test.AsyncReadUntil.pas"/>
+        <DCCReference Include="..\Source\AsyncIO.Detail.pas"/>
+        <DCCReference Include="..\Source\AsyncIO.Detail.StreamBufferImpl.pas"/>
+        <DCCReference Include="..\Source\AsyncIO.ErrorCodes.pas"/>
+        <DCCReference Include="..\Source\AsyncIO.Filesystem.Detail.pas"/>
+        <DCCReference Include="..\Source\AsyncIO.Filesystem.pas"/>
+        <DCCReference Include="..\Source\AsyncIO.Net.IP.Detail.pas"/>
+        <DCCReference Include="..\Source\AsyncIO.Net.IP.Detail.TCPImpl.pas"/>
+        <DCCReference Include="..\Source\AsyncIO.Net.IP.pas"/>
+        <DCCReference Include="..\Source\AsyncIO.pas"/>
+        <DCCReference Include="..\Source\AsyncIO.StreamReader.pas"/>
+        <DCCReference Include="..\..\BufferedStreamReader\BufStream.pas"/>
+        <DCCReference Include="..\..\BufferedStreamReader\BufStreamReader.pas"/>
+        <DCCReference Include="..\..\BufferedStreamReader\EncodingHelper.pas"/>
+        <DCCReference Include="..\..\RegularExpr\RegularExpr.Detail.pas"/>
+        <DCCReference Include="..\..\RegularExpr\RegularExpr.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>
