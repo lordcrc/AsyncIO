@@ -9,6 +9,9 @@
         <Projects Include="Test\AsyncIOTests.dproj">
             <Dependencies/>
         </Projects>
+        <Projects Include="Examples\FileCopy\AsyncFileCopy.dproj">
+            <Dependencies/>
+        </Projects>
     </ItemGroup>
     <ProjectExtensions>
         <Borland.Personality>Default.Personality.12</Borland.Personality>
@@ -35,14 +38,23 @@
     <Target Name="AsyncIOTests:Make">
         <MSBuild Projects="Test\AsyncIOTests.dproj" Targets="Make"/>
     </Target>
+    <Target Name="AsyncFileCopy">
+        <MSBuild Projects="Examples\FileCopy\AsyncFileCopy.dproj"/>
+    </Target>
+    <Target Name="AsyncFileCopy:Clean">
+        <MSBuild Projects="Examples\FileCopy\AsyncFileCopy.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="AsyncFileCopy:Make">
+        <MSBuild Projects="Examples\FileCopy\AsyncFileCopy.dproj" Targets="Make"/>
+    </Target>
     <Target Name="Build">
-        <CallTarget Targets="AsyncIODev;AsyncIOTests"/>
+        <CallTarget Targets="AsyncIODev;AsyncIOTests;AsyncFileCopy"/>
     </Target>
     <Target Name="Clean">
-        <CallTarget Targets="AsyncIODev:Clean;AsyncIOTests:Clean"/>
+        <CallTarget Targets="AsyncIODev:Clean;AsyncIOTests:Clean;AsyncFileCopy:Clean"/>
     </Target>
     <Target Name="Make">
-        <CallTarget Targets="AsyncIODev:Make;AsyncIOTests:Make"/>
+        <CallTarget Targets="AsyncIODev:Make;AsyncIOTests:Make;AsyncFileCopy:Make"/>
     </Target>
     <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
 </Project>
