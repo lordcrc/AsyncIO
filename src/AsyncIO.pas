@@ -20,8 +20,7 @@ uses
   WinAPI.Windows,
   System.SysUtils,
   System.Classes,
-  AsyncIO.ErrorCodes,
-  RegularExpr;
+  AsyncIO.ErrorCodes;
 
 type
   CompletionHandler = reference to procedure;
