@@ -44,7 +44,7 @@ begin
   fh := CreateFile(PChar(Filename), ac, sm, nil, cd, flags, 0);
 
   if (fh = INVALID_HANDLE_VALUE) then
-    RaiseLastOSError();
+    RaiseLastOSError(GetLastError(), #13#10 + 'Filename: "' + Filename + '"');
 
   // call create here
   // so that the handle is closed if the
