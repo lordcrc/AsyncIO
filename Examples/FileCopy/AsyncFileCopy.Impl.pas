@@ -130,7 +130,11 @@ begin
   ProgressUpdate;
 
   if (BytesTransferred = 0) then
+  begin
+    // stopping to be improved
+    Service.Stop;
     exit;
+  end;
 
   // we've read some data, now queue write
   StartWriteOperation(BytesTransferred);
