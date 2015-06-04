@@ -132,7 +132,7 @@ begin
   if (BytesTransferred = 0) then
     exit;
 
-  // reading done, queue write
+  // we've read some data, now queue write
   StartWriteOperation(BytesTransferred);
 end;
 
