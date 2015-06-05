@@ -20,7 +20,7 @@ type
     property Service: IOService read GetService;
   end;
 
-function NewAsyncFileCopier(const Service: IOService; const ProgressHandler: IOProgressHandler; const BufferSize: integer = 1024*1024): AsyncFileCopier;
+function NewAsyncFileCopier(const Service: IOService; const ProgressHandler: IOProgressHandler; const BufferSize: integer = 4*1024): AsyncFileCopier;
 
 implementation
 
