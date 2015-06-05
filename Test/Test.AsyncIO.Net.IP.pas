@@ -12,7 +12,8 @@ unit Test.AsyncIO.Net.IP;
 interface
 
 uses
-  TestFramework, NetTestCase,  IdWinsock2, AsyncIO, AsyncIO.Net.IP;
+  TestFramework, NetTestCase,  IdWinsock2, AsyncIO, AsyncIO.Net.IP,
+  EchoTestServer;
 
 type
   // Test methods for class IPv4Address
@@ -81,11 +82,28 @@ type
     procedure TestResolveIPv4;
     procedure TestResolveIPv6;
   end;
+  // Test methods for AsyncConnect function
+
+  TestAsyncConnect = class(TNetTestCase)
+  strict private
+    FTestServer: IEchoTestServer;
+    FService: IOService;
+    FResolverResults: IPResolver.Results;
+    FSocket: IPSocket;
+  public
+    procedure SetUp; override;
+    procedure TearDown; override;
+  published
+    procedure TestAsyncConnectSingle;
+    procedure TestAsyncConnectMultiple;
+    procedure TestAsyncConnectConditional;
+    procedure TestAsyncConnectNonExisting;
+  end;
 
 implementation
 
 uses
-  System.SysUtils;
+  System.SysUtils, AsyncIO.ErrorCodes;
 
 
 procedure TestIPv4Address.SetUp;
@@ -434,6 +452,162 @@ begin
   CheckEquals('', Entries[0].ServiceName, 'Failed to resolve IPv6 loopback 4');
 end;
 
+{ TestAsyncConnect }
+
+procedure TestAsyncConnect.SetUp;
+begin
+  FTestServer := NewEchoTestServer(7);
+  FService := NewIOService();
+  FResolverResults := IPResolver.Resolve(Query('localhost', '7'));
+  FSocket := NewTCPSocket(FService);
+end;
+
+procedure TestAsyncConnect.TearDown;
+begin
+  FTestServer := nil;
+  FService := nil;
+  FSocket := nil;
+end;
+
+procedure TestAsyncConnect.TestAsyncConnectConditional;
+var
+  Endpoints: TArray<IPEndpoint>;
+  EndpointIndex: integer;
+  Condition: ConnectCondition;
+  ConditionExecuted: boolean;
+  Handler: ConnectHandler;
+  HandlerExecuted: boolean;
+begin
+  FTestServer.Start;
+
+  Endpoints := FResolverResults.GetEndpoints();
+
+  ConditionExecuted := False;
+  HandlerExecuted := False;
+
+  EndpointIndex := 0;
+
+  Condition :=
+    function(const ErrorCode: IOErrorCode; const Endpoint: IPEndpoint): boolean
+    begin
+      ConditionExecuted := True;
+
+      CheckEquals(IOErrorCode.Success, ErrorCode, 'Connect condition');
+      CheckTrue(EndpointIndex < Length(Endpoints), 'Connect condition index 1');
+      CheckEquals(Endpoints[EndpointIndex], Endpoint, 'Connect condition');
+
+      EndpointIndex := EndpointIndex + 1;
+
+      // connect to the last one
+      result := EndpointIndex = Length(Endpoints);
+    end;
+
+  Handler :=
+    procedure(const ErrorCode: IOErrorCode; const Endpoint: IPEndpoint)
+    begin
+      HandlerExecuted := True;
+
+      CheckEquals(IOErrorCode.Success, ErrorCode, 'Connect result');
+      CheckEquals(Length(Endpoints), EndpointIndex, 'Connect condition index 2');
+      CheckEquals(Endpoints[EndpointIndex-1], Endpoint, 'Connected endpoint');
+    end;
+
+  AsyncConnect(FSocket, FResolverResults, Condition, Handler);
+
+  FService.RunOne;
+
+  CheckTrue(ConditionExecuted, 'Connect condition not executed');
+  CheckTrue(HandlerExecuted, 'Connect handler not executed');
+end;
+
+procedure TestAsyncConnect.TestAsyncConnectMultiple;
+var
+  Endpoints: TArray<IPEndpoint>;
+  Handler: ConnectHandler;
+  HandlerExecuted: boolean;
+begin
+  FTestServer.Start;
+
+  Endpoints := FResolverResults.GetEndpoints();
+
+  HandlerExecuted := False;
+
+  Handler :=
+    procedure(const ErrorCode: IOErrorCode; const Endpoint: IPEndpoint)
+    begin
+      HandlerExecuted := True;
+
+      CheckEquals(IOErrorCode.Success, ErrorCode, 'Connect result');
+      CheckEquals(Endpoints[0], Endpoint, 'Connected endpoint');
+    end;
+
+  AsyncConnect(FSocket, FResolverResults, Handler);
+
+  FService.RunOne;
+
+  CheckTrue(HandlerExecuted, 'Connect handler not executed');
+end;
+
+procedure TestAsyncConnect.TestAsyncConnectNonExisting;
+var
+  Endpoints: TArray<IPEndpoint>;
+  Handler: ConnectHandler;
+  HandlerExecuted: boolean;
+begin
+  SetLength(Endpoints, 2);
+
+  Endpoints[0] := Endpoint(IPAddress('10.20.31.42'), 1);
+  Endpoints[1] := Endpoint(IPAddress('10.42.31.20'), 1);
+
+  HandlerExecuted := False;
+
+  Handler :=
+    procedure(const ErrorCode: IOErrorCode; const Endpoint: IPEndpoint)
+    begin
+      HandlerExecuted := True;
+
+      CheckFalse(ErrorCode, 'Connect result');
+    end;
+
+  AsyncConnect(FSocket, Endpoints, Handler);
+
+  // two connection attempts
+  FService.RunOne;
+  FService.RunOne;
+
+  CheckTrue(HandlerExecuted, 'Connect handler not executed');
+end;
+
+procedure TestAsyncConnect.TestAsyncConnectSingle;
+var
+  Endpoints: TArray<IPEndpoint>;
+  Handler: ConnectHandler;
+  HandlerExecuted: boolean;
+begin
+  FTestServer.Start;
+
+  Endpoints := FResolverResults.GetEndpoints();
+
+  SetLength(Endpoints, 1);
+
+  HandlerExecuted := False;
+
+  Handler :=
+    procedure(const ErrorCode: IOErrorCode; const Endpoint: IPEndpoint)
+    begin
+      HandlerExecuted := True;
+
+      CheckEquals(IOErrorCode.Success, ErrorCode, 'Connect result');
+      CheckEquals(Endpoints[0], Endpoint, 'Connected endpoint');
+    end;
+
+  AsyncConnect(FSocket, Endpoints, Handler);
+
+  FService.RunOne;
+
+  CheckTrue(HandlerExecuted, 'Connect handler not executed');
+end;
+
 initialization
   // Register any test cases with the test runner
   RegisterTest(TestIPv4Address.Suite);
@@ -441,5 +615,6 @@ initialization
   RegisterTest(TestIPAddress.Suite);
   RegisterTest(TestIPEndpoint.Suite);
   RegisterTest(TestIPResolver.Suite);
+  RegisterTest(TestAsyncConnect.Suite);
 end.
 

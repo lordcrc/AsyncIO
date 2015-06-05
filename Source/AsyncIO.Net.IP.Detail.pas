@@ -3,7 +3,7 @@ unit AsyncIO.Net.IP.Detail;
 interface
 
 uses
-  AsyncIO, AsyncIO.Detail, AsyncIO.Net.IP;
+  AsyncIO, AsyncIO.ErrorCodes, AsyncIO.Detail, AsyncIO.Net.IP;
 
 const
 //#define SO_UPDATE_CONNECT_CONTEXT   0x7010
@@ -26,7 +26,14 @@ type
   end;
 
 
+function DefaultConnectCondition(const ErrorCode: IOErrorCode; const Endpoint: IPEndpoint): boolean;
+
 implementation
+
+function DefaultConnectCondition(const ErrorCode: IOErrorCode; const Endpoint: IPEndpoint): boolean;
+begin
+  result := True;
+end;
 
 { AsyncSocketStreamImpl }
 

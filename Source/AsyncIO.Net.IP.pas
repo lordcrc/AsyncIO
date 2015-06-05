@@ -3,7 +3,7 @@ unit AsyncIO.Net.IP;
 interface
 
 uses
-  IdWinsock2, AsyncIO;
+  IdWinsock2, AsyncIO, AsyncIO.ErrorCodes;
 
 type
   IPv4Address = record
@@ -274,6 +274,8 @@ type
       public
         function GetEnumerator: TResultsEnumerator;
 
+        function GetEndpoints: TArray<IPEndpoint>;
+
         function ToArray(): TArray<Entry>;
      end;
   public
@@ -335,10 +337,25 @@ type
 
 function NewAsyncSocketStream(const Socket: IPStreamSocket): AsyncSocketStream;
 
+type
+  // ErrorCode - error code from last attempt
+  // Endpoint - the endpoint of the connection if successful, otherwise unspecified endpoint
+  ConnectHandler = reference to procedure(const ErrorCode: IOErrorCode; const Endpoint: IPEndpoint);
+
+  // Should return true if connection should be attempted to the endpoint
+  // ErrorCode - error code from last attempt, initialized to Success
+  // Endpoint - the endpoint to be used for the next connection attempt
+  ConnectCondition = reference to function(const ErrorCode: IOErrorCode; const Endpoint: IPEndpoint): boolean;
+
+procedure AsyncConnect(const Socket: IPSocket; const Endpoints: IPResolver.Results; const Handler: ConnectHandler); overload;
+procedure AsyncConnect(const Socket: IPSocket; const Endpoints: TArray<IPEndpoint>; const Handler: ConnectHandler); overload;
+procedure AsyncConnect(const Socket: IPSocket; const Endpoints: IPResolver.Results; const Condition: ConnectCondition; const Handler: ConnectHandler); overload;
+procedure AsyncConnect(const Socket: IPSocket; const Endpoints: TArray<IPEndpoint>; const Condition: ConnectCondition; const Handler: ConnectHandler); overload;
+
 implementation
 
 uses
-  System.RegularExpressions, AsyncIO.ErrorCodes, IdWship6,
+  System.RegularExpressions, IdWship6,
   System.SysUtils, System.Math, Winapi.Windows, AsyncIO.Detail,
   AsyncIO.Net.IP.Detail, AsyncIO.Net.IP.Detail.TCPImpl;
 
@@ -1204,6 +1221,18 @@ begin
   SetLength(result.FResults, i);
 end;
 
+function IPResolver.Results.GetEndpoints: TArray<IPEndpoint>;
+var
+  i: integer;
+begin
+  SetLength(result, Length(FResults));
+
+  for i := 0 to High(FResults) do
+  begin
+    result[i] := FResults[i].Endpoint;
+  end;
+end;
+
 function IPResolver.Results.GetEnumerator: IPResolver.Results.TResultsEnumerator;
 begin
   result := TResultsEnumerator.Create(FResults);
@@ -1250,6 +1279,110 @@ end;
 function NewTCPSocket(const Service: IOService): IPStreamSocket;
 begin
   result := TTCPSocketImpl.Create(Service);
+end;
+
+//type
+//  AsyncConnectOp = class(TInterfacedObject, OpHandler)
+//  strict private
+//    FEndpoints: TArray<IPEndpoint>;
+//    FCurrentIndex: integer;
+//    FPrevError: IOErrorCode;
+//    FCondition: ConnectCondition;
+//    FHandler: ConnectHandler;
+//
+//    procedure Invoke(const ErrorCode: IOErrorCode);
+//  public
+//    constructor Create(const Socket: IPSocket; const Endpoints: TArray<IPEndpoint>; const Condition: ConnectCondition; const Handler: CompletionHandler);
+//  end;
+//
+//{ AsyncConnectOp }
+//
+//constructor AsyncConnectOp.Create(const Socket: IPSocket; const Endpoints: TArray<IPEndpoint>;
+//  const Condition: ConnectCondition; const Handler: CompletionHandler);
+//begin
+//
+//end;
+//
+//procedure AsyncConnectOp.Invoke(const ErrorCode: IOErrorCode);
+//begin
+//
+//end;
+//
+//{ AsyncConnectOp }
+//
+//constructor AsyncConnectOp.Create(const Socket: IPSocket; const Endpoints: TArray<IPEndpoint>;
+//  const Condition: ConnectCondition; const Handler: CompletionHandler);
+//begin
+//
+//end;
+//
+//procedure AsyncConnectOp.Invoke(const ErrorCode: IOErrorCode);
+//begin
+//
+//end;
+
+
+procedure AsyncConnect(const Socket: IPSocket; const Endpoints: IPResolver.Results; const Handler: ConnectHandler);
+begin
+  AsyncConnect(Socket, Endpoints.GetEndpoints(), Handler);
+end;
+
+procedure AsyncConnect(const Socket: IPSocket; const Endpoints: TArray<IPEndpoint>; const Handler: ConnectHandler);
+begin
+  AsyncConnect(Socket, Endpoints, DefaultConnectCondition, Handler);
+end;
+
+procedure AsyncConnect(const Socket: IPSocket; const Endpoints: IPResolver.Results; const Condition: ConnectCondition; const Handler: ConnectHandler);
+begin
+  AsyncConnect(Socket, Endpoints.GetEndpoints(), Condition, Handler);
+end;
+
+procedure AsyncConnect(const Socket: IPSocket; const Endpoints: TArray<IPEndpoint>; const Condition: ConnectCondition; const Handler: ConnectHandler);
+var
+  connectOp: OpHandler;
+  idx: integer;
+begin
+  if (Length(Endpoints) <= 0) then
+    raise EArgumentException.Create('AsyncConnect: No endpoints');
+
+  idx := -1;
+
+  connectOp :=
+    procedure(const ErrorCode: IOErrorCode)
+    var
+      start: boolean;
+      useEndpoint: boolean;
+    begin
+      start := (idx < 0);
+
+      if (not start) and (ErrorCode = ErrorCode.Success) then
+      begin
+        Handler(ErrorCode, Endpoints[idx]);
+        connectOp := nil; // release handler
+        exit;
+      end;
+
+      while True do
+      begin
+        idx := idx + 1;
+        if (idx >= Length(Endpoints)) then
+        begin
+          Handler(ErrorCode, Endpoint());
+          connectOp := nil; // release handler
+          exit;
+        end;
+
+        useEndpoint := Condition(ErrorCode, Endpoints[idx]);
+
+        if (useEndpoint) then
+          break;
+      end;
+
+      Socket.Close;
+      Socket.AsyncConnect(Endpoints[idx], connectOp);
+    end;
+
+  connectOp(IOErrorCode.Success);
 end;
 
 initialization
