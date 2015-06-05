@@ -187,7 +187,8 @@ var
 begin
   s := FSocketHandle;
   ResetSocket;
-  res := IdWinsock2.closesocket(s)
+  if (s <> INVALID_SOCKET) then
+    res := IdWinsock2.closesocket(s)
 end;
 
 procedure TTCPSocketImpl.Connect(const PeerEndpoint: IPEndpoint);
