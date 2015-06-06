@@ -196,7 +196,7 @@ begin
   result :=
     function(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64): UInt64
     begin
-      result := IfThen(ErrorCode, MaxTransferSize, 0);
+      result := IfThen((not ErrorCode), MaxTransferSize, 0);
     end;
 end;
 
@@ -205,7 +205,7 @@ begin
   result :=
     function(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64): UInt64
     begin
-      result := IfThen(ErrorCode and (BytesTransferred < Minimum), MaxTransferSize, 0);
+      result := IfThen((not ErrorCode) and (BytesTransferred < Minimum), MaxTransferSize, 0);
     end;
 end;
 
@@ -214,7 +214,7 @@ begin
   result :=
     function(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64): UInt64
     begin
-      result := IfThen(ErrorCode and (BytesTransferred < Size), Min(Size - BytesTransferred, MaxTransferSize), 0);
+      result := IfThen((not ErrorCode) and (BytesTransferred < Size), Min(Size - BytesTransferred, MaxTransferSize), 0);
     end;
 end;
 
@@ -258,7 +258,7 @@ begin
 
   readMore := True;
 
-  if ((not ErrorCode) or (BytesTransferred = 0)) then
+  if ((ErrorCode) or (BytesTransferred = 0)) then
     readMore := False;
 
   n := FCompletionCondition(ErrorCode, FTotalBytesTransferred);
@@ -339,7 +339,7 @@ begin
 
   readMore := True;
 
-  if ((not ErrorCode) or (BytesTransferred = 0)) then
+  if ((ErrorCode) or (BytesTransferred = 0)) then
     readMore := False;
 
   n := FCompletionCondition(ErrorCode, FTotalBytesTransferred);
@@ -478,7 +478,7 @@ begin
 
   readMore := True;
 
-  if ((not ErrorCode) or (BytesTransferred = 0)) then
+  if ((ErrorCode) or (BytesTransferred = 0)) then
     readMore := False;
 
   match := PartialSearch(PByte(FBuffer) + FSearchPosition, FSearchPosition - FBuffer.BufferSize, FDelim, matchPos);
@@ -522,7 +522,7 @@ begin
   else
   begin
     // write what we have to the destination stream
-    n := IfThen(ErrorCode and match, FSearchPosition, 0);
+    n := IfThen((not ErrorCode) and match, FSearchPosition, 0);
     FHandler(ErrorCode, n);
   end;
 end;
@@ -585,20 +585,20 @@ procedure AsyncWriteOp.Invoke(const ErrorCode: IOErrorCode;
   const BytesTransferred: UInt64);
 var
   n: UInt64;
-  readMore: boolean;
+  writeMore: boolean;
 begin
   FTotalBytesTransferred := FTotalBytesTransferred + BytesTransferred;
 
-  readMore := True;
+  writeMore := True;
 
-  if ((not ErrorCode) and (BytesTransferred = 0)) then
-    readMore := False;
+  if ((ErrorCode) or (BytesTransferred = 0)) then
+    writeMore := False;
 
   n := FCompletionCondition(ErrorCode, FTotalBytesTransferred);
   if (n = 0) or (FTotalBytesTransferred = FBuffer.Size) then
-    readMore := False;
+    writeMore := False;
 
-  if (readMore) then
+  if (writeMore) then
   begin
     FStream.AsyncWriteSome(MakeBuffer(FBuffer, n), Self);
   end

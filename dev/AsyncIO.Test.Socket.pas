@@ -137,7 +137,7 @@ end;
 
 procedure EchoClient.HandleConnect(const ErrorCode: IOErrorCode);
 begin
-  if (not ErrorCode) then
+  if (ErrorCode) then
     RaiseLastOSError(ErrorCode.Value);
 
   WriteLn('Client connected');
@@ -172,7 +172,7 @@ var
   s: string;
   responseMatches: boolean;
 begin
-  if (not ErrorCode) then
+  if (ErrorCode) then
     RaiseLastOSError(ErrorCode.Value);
 
   s := TEncoding.Unicode.GetString(FResponseData, 0, BytesTransferred);
@@ -197,7 +197,7 @@ end;
 procedure EchoClient.HandleWrite(const ErrorCode: IOErrorCode;
   const BytesTransferred: UInt64);
 begin
-  if (not ErrorCode) then
+  if (ErrorCode) then
     RaiseLastOSError(ErrorCode.Value);
 
   // half close

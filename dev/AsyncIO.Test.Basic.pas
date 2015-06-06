@@ -87,7 +87,7 @@ end;
 
 procedure FileScanner.ReadHandler(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64);
 begin
-  if (not ErrorCode) then
+  if (ErrorCode) then
   begin
     if (ErrorCode = IOErrorCode.EndOfFile) then
     begin

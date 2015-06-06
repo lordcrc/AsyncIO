@@ -41,6 +41,8 @@ type
     class operator LogicalNot(const ec: IOErrorCode): boolean;
     class operator LogicalAnd(const ec: IOErrorCode; const Other: boolean): boolean;
     class operator LogicalAnd(const Other: boolean; const ec: IOErrorCode): boolean;
+    class operator LogicalOr(const ec: IOErrorCode; const Other: boolean): boolean;
+    class operator LogicalOr(const Other: boolean; const ec: IOErrorCode): boolean;
   end;
 
 
@@ -97,11 +99,15 @@ end;
 
 class operator IOErrorCode.Implicit(const ec: IOErrorCode): boolean;
 begin
-  result := ec.Value = ERROR_SUCCESS;
+  result := (ec.Value <> ERROR_SUCCESS);
 end;
 
-class operator IOErrorCode.LogicalAnd(const Other: boolean;
-  const ec: IOErrorCode): boolean;
+class operator IOErrorCode.LogicalAnd(const ec: IOErrorCode; const Other: boolean): boolean;
+begin
+  result := boolean(ec) and Other;
+end;
+
+class operator IOErrorCode.LogicalAnd(const Other: boolean; const ec: IOErrorCode): boolean;
 begin
   result := Other and boolean(ec);
 end;
@@ -111,15 +117,19 @@ begin
   result := not boolean(ec);
 end;
 
+class operator IOErrorCode.LogicalOr(const ec: IOErrorCode; const Other: boolean): boolean;
+begin
+  result := boolean(ec) or Other;
+end;
+
+class operator IOErrorCode.LogicalOr(const Other: boolean; const ec: IOErrorCode): boolean;
+begin
+  result := Other or boolean(ec);
+end;
+
 class operator IOErrorCode.NotEqual(const A, B: IOErrorCode): boolean;
 begin
   result := A.FErrorCode <> B.FErrorCode;
-end;
-
-class operator IOErrorCode.LogicalAnd(const ec: IOErrorCode;
-  const Other: boolean): boolean;
-begin
-  result := boolean(ec) and Other;
 end;
 
 class function IOErrorCode.Success: IOErrorCode;

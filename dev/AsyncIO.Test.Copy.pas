@@ -98,7 +98,7 @@ end;
 procedure FileCopier.ReadHandler(const ErrorCode: IOErrorCode;
   const BytesTransferred: UInt64);
 begin
-  if (not ErrorCode) and (ErrorCode <> IOErrorCode.EndOfFile) then
+  if (ErrorCode) and (ErrorCode <> IOErrorCode.EndOfFile) then
   begin
     RaiseLastOSError(ErrorCode.Value, 'While reading file');
   end;
@@ -121,7 +121,7 @@ end;
 procedure FileCopier.WriteHandler(const ErrorCode: IOErrorCode;
   const BytesTransferred: UInt64);
 begin
-  if (not ErrorCode) then
+  if (ErrorCode) then
   begin
     RaiseLastOSError(ErrorCode.Value, 'While writing file');
   end;

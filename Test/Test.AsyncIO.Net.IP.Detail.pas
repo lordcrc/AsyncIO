@@ -79,7 +79,7 @@ begin
     procedure(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64)
     begin
       FHandlerExecuted := True;
-      CheckTrue(ErrorCode, 'Error: ' + ErrorCode.Message);
+      CheckFalse(ErrorCode, 'Error: ' + ErrorCode.Message);
       CheckEquals(42, BytesTransferred, 'BytesTransferred incorrect');
     end;
 
@@ -103,7 +103,7 @@ begin
     procedure(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64)
     begin
       FHandlerExecuted := True;
-      CheckTrue(ErrorCode, 'Error: ' + ErrorCode.Message);
+      CheckFalse(ErrorCode, 'Error: ' + ErrorCode.Message);
       CheckEquals(42, BytesTransferred, 'BytesTransferred incorrect');
     end;
 

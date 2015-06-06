@@ -60,7 +60,7 @@ end;
 
 function AsyncTCPEchoClientImpl.ConnectCondition(const ErrorCode: IOErrorCode; const Endpoint: IPEndpoint): boolean;
 begin
-  if (not ErrorCode) then
+  if (ErrorCode) then
   begin
     ProgressUpdate('Connection attempt failed: ' + ErrorCode.Message);
   end;
@@ -73,7 +73,7 @@ end;
 
 procedure AsyncTCPEchoClientImpl.ConnectHandler(const ErrorCode: IOErrorCode; const Endpoint: IPEndpoint);
 begin
-  if (not ErrorCode) then
+  if (ErrorCode) then
   begin
     ProgressUpdate('Connection attempt failed: ' + ErrorCode.Message);
     ProgressUpdate('Unable to connect to host');
@@ -135,7 +135,7 @@ procedure AsyncTCPEchoClientImpl.ReadHandler(const ErrorCode: IOErrorCode; const
 var
   matches: boolean;
 begin
-  if (not ErrorCode) then
+  if (ErrorCode) then
     RaiseLastOSError(ErrorCode.Value);
 
   // we got the response, compare with what we sent
@@ -154,7 +154,7 @@ end;
 
 procedure AsyncTCPEchoClientImpl.WriteHandler(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64);
 begin
-  if (not ErrorCode) then
+  if (ErrorCode) then
     RaiseLastOSError(ErrorCode.Value);
 
   ProgressUpdate('Retrieving echo response');

@@ -115,7 +115,7 @@ end;
 
 procedure AsyncFileCopierImpl.ReadHandler(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64);
 begin
-  if (not ErrorCode) and (ErrorCode <> IOErrorCode.EndOfFile) then
+  if (ErrorCode) and (ErrorCode <> IOErrorCode.EndOfFile) then
   begin
     RaiseLastOSError(ErrorCode.Value, 'Reading file');
   end;
@@ -154,7 +154,7 @@ end;
 
 procedure AsyncFileCopierImpl.WriteHandler(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64);
 begin
-  if (not ErrorCode) then
+  if (ErrorCode) then
   begin
     RaiseLastOSError(ErrorCode.Value, 'Writing file');
   end;

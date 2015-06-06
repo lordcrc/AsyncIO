@@ -492,7 +492,7 @@ begin
     begin
       ConditionExecuted := True;
 
-      CheckEquals(IOErrorCode.Success, ErrorCode, 'Connect condition');
+      CheckFalse(ErrorCode, 'Connect result: ' + ErrorCode.Message);
       CheckTrue(EndpointIndex < Length(Endpoints), 'Connect condition index 1');
       CheckEquals(Endpoints[EndpointIndex], Endpoint, 'Connect condition');
 
@@ -507,7 +507,7 @@ begin
     begin
       HandlerExecuted := True;
 
-      CheckEquals(IOErrorCode.Success, ErrorCode, 'Connect result');
+      CheckFalse(ErrorCode, 'Connect result: ' + ErrorCode.Message);
       CheckEquals(Length(Endpoints), EndpointIndex, 'Connect condition index 2');
       CheckEquals(Endpoints[EndpointIndex-1], Endpoint, 'Connected endpoint');
     end;
@@ -537,7 +537,7 @@ begin
     begin
       HandlerExecuted := True;
 
-      CheckEquals(IOErrorCode.Success, ErrorCode, 'Connect result');
+      CheckFalse(ErrorCode, 'Connect result: ' + ErrorCode.Message);
       CheckEquals(Endpoints[0], Endpoint, 'Connected endpoint');
     end;
 
@@ -566,7 +566,7 @@ begin
     begin
       HandlerExecuted := True;
 
-      CheckFalse(ErrorCode, 'Connect result');
+      CheckTrue(ErrorCode, 'Connection attempts should fail but didn''t');
     end;
 
   AsyncConnect(FSocket, Endpoints, Handler);
@@ -597,7 +597,7 @@ begin
     begin
       HandlerExecuted := True;
 
-      CheckEquals(IOErrorCode.Success, ErrorCode, 'Connect result');
+      CheckFalse(ErrorCode, 'Connect result: ' + ErrorCode.Message);
       CheckEquals(Endpoints[0], Endpoint, 'Connected endpoint');
     end;
 
