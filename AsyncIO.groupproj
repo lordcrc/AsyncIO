@@ -12,6 +12,9 @@
         <Projects Include="Examples\FileCopy\AsyncFileCopy.dproj">
             <Dependencies/>
         </Projects>
+        <Projects Include="Examples\TCPEcho\AsyncEchoClient.dproj">
+            <Dependencies/>
+        </Projects>
     </ItemGroup>
     <ProjectExtensions>
         <Borland.Personality>Default.Personality.12</Borland.Personality>
@@ -47,14 +50,23 @@
     <Target Name="AsyncFileCopy:Make">
         <MSBuild Projects="Examples\FileCopy\AsyncFileCopy.dproj" Targets="Make"/>
     </Target>
+    <Target Name="AsyncEchoClient">
+        <MSBuild Projects="Examples\TCPEcho\AsyncEchoClient.dproj"/>
+    </Target>
+    <Target Name="AsyncEchoClient:Clean">
+        <MSBuild Projects="Examples\TCPEcho\AsyncEchoClient.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="AsyncEchoClient:Make">
+        <MSBuild Projects="Examples\TCPEcho\AsyncEchoClient.dproj" Targets="Make"/>
+    </Target>
     <Target Name="Build">
-        <CallTarget Targets="AsyncIODev;AsyncIOTests;AsyncFileCopy"/>
+        <CallTarget Targets="AsyncIODev;AsyncIOTests;AsyncFileCopy;AsyncEchoClient"/>
     </Target>
     <Target Name="Clean">
-        <CallTarget Targets="AsyncIODev:Clean;AsyncIOTests:Clean;AsyncFileCopy:Clean"/>
+        <CallTarget Targets="AsyncIODev:Clean;AsyncIOTests:Clean;AsyncFileCopy:Clean;AsyncEchoClient:Clean"/>
     </Target>
     <Target Name="Make">
-        <CallTarget Targets="AsyncIODev:Make;AsyncIOTests:Make;AsyncFileCopy:Make"/>
+        <CallTarget Targets="AsyncIODev:Make;AsyncIOTests:Make;AsyncFileCopy:Make;AsyncEchoClient:Make"/>
     </Target>
     <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
 </Project>
