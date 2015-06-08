@@ -3,10 +3,10 @@ unit AsyncIO.Net.IP.Detail.TCPImpl;
 interface
 
 uses
-  IdWinsock2, AsyncIO, AsyncIO.Net.IP;
+  IdWinsock2, AsyncIO, AsyncIO.Net.IP, AsyncIO.Net.IP.Detail;
 
 type
-  TTCPSocketImpl = class(TInterfacedObject, IPStreamSocket)
+  TTCPSocketImpl = class(TInterfacedObject, IPStreamSocket, IPSocketAccess)
   strict private
     FSocketHandle: TSocket;
     FService: IOService;
@@ -22,6 +22,10 @@ type
     constructor Create(const Service: IOService);
     destructor Destroy; override;
 
+    // IPSocketAccess
+    procedure Assign(const Protocol: IPProtocol; const SocketHandle: TSocket);
+
+    // IPStreamSocket
     function GetService: IOService;
     function GetProtocol: IPProtocol;
     function GetLocalEndpoint: IPEndpoint;
@@ -45,12 +49,60 @@ type
     property Protocol: IPProtocol read FProtocol;
   end;
 
+  TTCPAcceptorImpl = class(TInterfacedObject, IPAcceptor)
+  strict private
+    FSocketHandle: TSocket;
+    FService: IOService;
+    FProtocol: IPProtocol;
+
+    function CreateSocket: TSocket;
+    procedure CloseSocket(const SocketHandle: TSocket);
+    procedure ResetSocket;
+
+  protected
+    property SocketHandle: TSocket read FSocketHandle;
+  public
+    constructor Create(const Service: IOService);
+    destructor Destroy; override;
+
+    function GetService: IOService;
+    function GetProtocol: IPProtocol;
+    function GetLocalEndpoint: IPEndpoint;
+    function GetIsOpen: boolean;
+
+    procedure AsyncAccept(const Peer: IPSocket; const Handler: OpHandler);
+
+    procedure Open(const Protocol: IPProtocol);
+
+    procedure Bind(const LocalEndpoint: IPEndpoint);
+
+    procedure Listen(); overload;
+    procedure Listen(const Backlog: integer); overload;
+
+    procedure Close;
+
+    property Service: IOService read FService;
+    property Protocol: IPProtocol read FProtocol;
+    property LocalEndpoint: IPEndpoint read GetLocalEndpoint;
+    property IsOpen: boolean read GetIsOpen;
+  end;
+
 implementation
 
 uses
-  Winapi.Windows, System.SysUtils, AsyncIO.ErrorCodes, AsyncIO.Detail, AsyncIO.Net.IP.Detail;
+  Winapi.Windows, System.SysUtils, AsyncIO.ErrorCodes, AsyncIO.Detail;
 
 { TTCPSocketImpl }
+
+procedure TTCPSocketImpl.Assign(const Protocol: IPProtocol; const SocketHandle: TSocket);
+begin
+  if (SocketInitialized) then
+    raise EArgumentException.Create('Socket already open in Assign');
+
+  FSocketHandle := SocketHandle;
+
+  IOServiceAssociateHandle(Service, SocketHandle);
+end;
 
 procedure TTCPSocketImpl.AsyncConnect(const PeerEndpoint: IPEndpoint;
   const Handler: OpHandler);
@@ -78,7 +130,7 @@ begin
       ec: IOErrorCode;
     begin
       ec := ErrorCode;
-      if (ec) then
+      if (not ec) then
       begin
         // update socket options
         // ConnectEx requires this
@@ -218,7 +270,7 @@ end;
 
 procedure TTCPSocketImpl.CreateSocket;
 begin
-  if (SocketHandle <> INVALID_SOCKET) then
+  if (SocketInitialized) then
     raise EInvalidOpException.Create('Socket already allocated in CreateSocket (TCP)');
 
   if (Protocol.SocketType <> SOCK_STREAM) then
@@ -233,7 +285,7 @@ end;
 
 destructor TTCPSocketImpl.Destroy;
 begin
-  if (FSocketHandle <> INVALID_SOCKET) then
+  if (SocketInitialized) then
     Close;
 
   inherited;
@@ -299,6 +351,189 @@ const
     (SD_RECEIVE, SD_SEND, SD_BOTH);
 begin
   IdWinsock2.shutdown(SocketHandle, ShutdownFlagMapping[ShutdownFlag]);
+end;
+
+{ TTCPAcceptorImpl }
+
+procedure TTCPAcceptorImpl.AsyncAccept(const Peer: IPSocket; const Handler: OpHandler);
+var
+  bytesReceived: DWORD;
+  addrLength: integer;
+  addrBuffer: TBytes;
+  listenSocket: TSocket;
+  peerSocket: TSocket;
+  peerProtocol: IPProtocol;
+  ctx: OpHandlerContext;
+  res: boolean;
+  ec: DWORD;
+begin
+  listenSocket := SocketHandle;
+
+  ctx := OpHandlerContext.Create(
+    procedure(const ErrorCode: IOErrorCode)
+    var
+      err: DWORD;
+      ec: IOErrorCode;
+    begin
+      ec := ErrorCode;
+
+      // ensure we capture addrBuffer
+      // TODO - extract peer endpoint
+      addrBuffer := nil;
+
+      // assign the peer socket handle
+      IPSocketAssign(Peer, peerProtocol, peerSocket);
+
+      if (not ec) then
+      begin
+        // update socket options, need to associate the listen socket with the accept socket
+        // AcceptEx requires this for getsockname/getpeername
+        err := IdWinsock2.setsockopt(Peer.SocketHandle, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, @listenSocket, SizeOf(listenSocket));
+        if (err <> 0) then
+          // set code from GetLastError
+          ec := IOErrorCode.FromLastError();
+      end;
+
+      // if connect succeeded but setsockopt failed, pass the error from the latter
+      Handler(ec);
+    end
+  );
+
+  // MSDN:
+  // The buffer size for the local and remote address must be 16 bytes more than the size of the
+  // sockaddr structure for the transport protocol in use because the addresses are written in an internal format.
+  addrLength := (SizeOf(TSockAddrStorage) + 16);
+  SetLength(addrBuffer, 2 * addrLength);
+
+  peerProtocol := Protocol;
+  peerSocket := CreateSocket();
+
+  res := IdWinsock2.AcceptEx(SocketHandle, peerSocket, addrBuffer, 0, addrLength, addrLength, bytesReceived, ctx.Overlapped);
+  if (not res) then
+  begin
+    ec := GetLastError;
+    if (ec <> WSA_IO_PENDING) then
+      RaiseLastOSError(ec);
+  end;
+end;
+
+procedure TTCPAcceptorImpl.Bind(const LocalEndpoint: IPEndpoint);
+var
+  res: WinsockResult;
+begin
+  if (LocalEndpoint.IsIPv4) then
+    FProtocol := IPProtocol.TCP.v4
+  else if (LocalEndpoint.IsIPv6) then
+    FProtocol := IPProtocol.TCP.v6
+  else
+    FProtocol := IPProtocol.TCP.Unspecified;
+
+  if (not IsOpen) then
+    Open(Protocol);
+
+  res := IdWinsock2.bind(SocketHandle, LocalEndpoint.Data, LocalEndpoint.DataLength);
+end;
+
+procedure TTCPAcceptorImpl.Close;
+var
+  s: TSocket;
+begin
+  s := FSocketHandle;
+  ResetSocket;
+  CloseSocket(s);
+end;
+
+procedure TTCPAcceptorImpl.CloseSocket(const SocketHandle: TSocket);
+var
+  res: WinSockResult;
+begin
+  if (SocketHandle <> INVALID_SOCKET) then
+    res := IdWinsock2.closesocket(SocketHandle)
+end;
+
+constructor TTCPAcceptorImpl.Create(const Service: IOService);
+begin
+  inherited Create;
+
+  FService := Service;
+  ResetSocket;
+end;
+
+function TTCPAcceptorImpl.CreateSocket: TSocket;
+begin
+  result := IdWinsock2.socket(Protocol.Family, Protocol.SocketType, Protocol.Protocol);
+  if (result = INVALID_SOCKET) then
+    RaiseLastOSError(WSAGetLastError, 'CreateSocket (TCP)');
+end;
+
+destructor TTCPAcceptorImpl.Destroy;
+begin
+  if (SocketHandle <> INVALID_SOCKET) then
+    Close;
+
+  inherited;
+end;
+
+function TTCPAcceptorImpl.GetIsOpen: boolean;
+begin
+  result := SocketHandle <> INVALID_SOCKET;
+end;
+
+function TTCPAcceptorImpl.GetLocalEndpoint: IPEndpoint;
+var
+  addr: TSockAddrIn6;
+  addrlen: integer;
+  res: WinSockResult;
+begin
+  FillChar(addr, SizeOf(addr), 0);
+  addrlen := SizeOf(addr);
+
+  res := IdWinsock2.getsockname(SocketHandle, @addr, addrlen);
+
+  result := IPEndpoint.FromData(addr, addrlen);
+end;
+
+function TTCPAcceptorImpl.GetProtocol: IPProtocol;
+begin
+  result := FProtocol;
+end;
+
+function TTCPAcceptorImpl.GetService: IOService;
+begin
+  result := FService;
+end;
+
+procedure TTCPAcceptorImpl.Listen(const Backlog: integer);
+var
+  res: WinsockResult;
+begin
+  res := IdWinsock2.listen(SocketHandle, Backlog);
+end;
+
+procedure TTCPAcceptorImpl.Listen;
+begin
+  Listen(SOMAXCONN);
+end;
+
+procedure TTCPAcceptorImpl.Open(const Protocol: IPProtocol);
+begin
+  if (Protocol.SocketType <> SOCK_STREAM) then
+    raise EArgumentException.Create('Invalid socket type in CreateSocket (TCP)');
+
+  if (SocketHandle <> INVALID_SOCKET) then
+    raise EInvalidOpException.Create('Socket already allocated in Open (TCP)');
+
+  FProtocol := Protocol;
+
+  FSocketHandle := CreateSocket();
+
+  IOServiceAssociateHandle(Service, SocketHandle);
+end;
+
+procedure TTCPAcceptorImpl.ResetSocket;
+begin
+  FSocketHandle := INVALID_SOCKET;
+  FProtocol := IPProtocol.TCP.Unspecified;
 end;
 
 end.

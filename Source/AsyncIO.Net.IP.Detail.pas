@@ -3,11 +3,19 @@ unit AsyncIO.Net.IP.Detail;
 interface
 
 uses
-  AsyncIO, AsyncIO.ErrorCodes, AsyncIO.Detail, AsyncIO.Net.IP;
+  IdWinsock2, AsyncIO, AsyncIO.ErrorCodes, AsyncIO.Detail, AsyncIO.Net.IP;
 
 const
 //#define SO_UPDATE_CONNECT_CONTEXT   0x7010
   SO_UPDATE_CONNECT_CONTEXT = $7010;
+
+type
+  IPSocketAccess = interface
+    ['{05B1639C-2E59-4174-B18B-43E2B40F1E50}']
+    procedure Assign(const Protocol: IPProtocol; const SocketHandle: TSocket);
+  end;
+
+procedure IPSocketAssign(const Socket: IPSocket; const Protocol: IPProtocol; const SocketHandle: TSocket);
 
 type
   AsyncSocketStreamImpl = class(AsyncStreamImplBase, AsyncSocketStream)
@@ -25,10 +33,17 @@ type
     property Socket: IPStreamSocket read FSocket;
   end;
 
-
 function DefaultConnectCondition(const ErrorCode: IOErrorCode; const Endpoint: IPEndpoint): boolean;
 
 implementation
+
+procedure IPSocketAssign(const Socket: IPSocket; const Protocol: IPProtocol; const SocketHandle: TSocket);
+var
+  socketAccess: IPSocketAccess;
+begin
+  socketAccess := Socket as IPSocketAccess;
+  socketAccess.Assign(Protocol, SocketHandle);
+end;
 
 function DefaultConnectCondition(const ErrorCode: IOErrorCode; const Endpoint: IPEndpoint): boolean;
 begin

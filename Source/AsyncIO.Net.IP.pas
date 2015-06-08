@@ -331,6 +331,37 @@ type
 
 function NewTCPSocket(const Service: IOService): IPStreamSocket;
 
+type
+  IPAcceptor = interface
+{$REGION 'Property accessors'}
+    function GetService: IOService;
+    function GetProtocol: IPProtocol;
+    function GetLocalEndpoint: IPEndpoint;
+    function GetIsOpen: boolean;
+{$ENDREGION}
+
+    procedure AsyncAccept(const Peer: IPSocket; const Handler: OpHandler);
+
+    procedure Open(const Protocol: IPProtocol);
+
+    procedure Bind(const Endpoint: IPEndpoint);
+
+    procedure Listen(); overload;
+    procedure Listen(const Backlog: integer); overload;
+
+    procedure Close;
+
+    property Service: IOService read GetService;
+    property Protocol: IPProtocol read GetProtocol;
+    property LocalEndpoint: IPEndpoint read GetLocalEndpoint;
+    property IsOpen: boolean read GetIsOpen;
+  end;
+
+// non-open acceptor
+function NewTCPAcceptor(const Service: IOService): IPAcceptor; overload;
+// open acceptor on the given endpoint
+function NewTCPAcceptor(const Service: IOService; const LocalEndpoint: IPEndpoint): IPAcceptor; overload;
+
 
 type
   AsyncSocketStream = interface(AsyncStream)
@@ -1308,46 +1339,17 @@ begin
   result := TTCPSocketImpl.Create(Service);
 end;
 
-//type
-//  AsyncConnectOp = class(TInterfacedObject, OpHandler)
-//  strict private
-//    FEndpoints: TArray<IPEndpoint>;
-//    FCurrentIndex: integer;
-//    FPrevError: IOErrorCode;
-//    FCondition: ConnectCondition;
-//    FHandler: ConnectHandler;
-//
-//    procedure Invoke(const ErrorCode: IOErrorCode);
-//  public
-//    constructor Create(const Socket: IPSocket; const Endpoints: TArray<IPEndpoint>; const Condition: ConnectCondition; const Handler: CompletionHandler);
-//  end;
-//
-//{ AsyncConnectOp }
-//
-//constructor AsyncConnectOp.Create(const Socket: IPSocket; const Endpoints: TArray<IPEndpoint>;
-//  const Condition: ConnectCondition; const Handler: CompletionHandler);
-//begin
-//
-//end;
-//
-//procedure AsyncConnectOp.Invoke(const ErrorCode: IOErrorCode);
-//begin
-//
-//end;
-//
-//{ AsyncConnectOp }
-//
-//constructor AsyncConnectOp.Create(const Socket: IPSocket; const Endpoints: TArray<IPEndpoint>;
-//  const Condition: ConnectCondition; const Handler: CompletionHandler);
-//begin
-//
-//end;
-//
-//procedure AsyncConnectOp.Invoke(const ErrorCode: IOErrorCode);
-//begin
-//
-//end;
+function NewTCPAcceptor(const Service: IOService): IPAcceptor; overload;
+begin
+  result := TTCPAcceptorImpl.Create(Service);
+end;
 
+function NewTCPAcceptor(const Service: IOService; const LocalEndpoint: IPEndpoint): IPAcceptor; overload;
+begin
+  result := NewTCPAcceptor(Service);
+  result.Bind(LocalEndpoint);
+  result.Listen();
+end;
 
 procedure AsyncConnect(const Socket: IPSocket; const Endpoints: IPResolver.Results; const Handler: ConnectHandler);
 begin
