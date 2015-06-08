@@ -124,13 +124,58 @@ begin
   end;
 end;
 
+type
+  EchoServer = class
+  private
+    FData: TBytes;
+    FAcceptor: IPAcceptor;
+    FPeerSocket: IPStreamSocket;
+    FStream: AsyncSocketStream;
+
+    procedure HandleAccept(const ErrorCode: IOErrorCode);
+    procedure HandleRead(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64);
+    procedure HandleWrite(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64);
+  public
+    constructor Create(const Service: IOService; const LocalEndpoint: IPEndpoint);
+  end;
+
+procedure TestEchoServer;
+var
+  ip: IPEndpoint;
+  ios: IOService;
+  server: EchoServer;
+  r: Int64;
+begin
+  ios := nil;
+  server := nil;
+  try
+    ip := Endpoint(IPAddressFamily.v6, 7);
+
+    ios := NewIOService;
+
+    WriteLn('Listening on ' + ip);
+
+    server := EchoServer.Create(ios, ip);
+
+    r := ios.Run;
+
+    WriteLn;
+    WriteLn('Done');
+    WriteLn(Format('%d handlers executed', [r]));
+  finally
+    server.Free;
+  end;
+end;
+
 procedure RunSocketTest;
 begin
 //  TestAddress;
 //  TestEndpoint;
 //  TestResolve;
 
-  TestEcho;
+//  TestEcho;
+
+  TestEchoServer;
 end;
 
 { EchoClient }
@@ -208,6 +253,64 @@ begin
   SetLength(FResponseData, Length(FRequestData));
 
   AsyncRead(FStream, FResponseData, TransferAtLeast(Length(FResponseData)), HandleRead);
+end;
+
+{ EchoServer }
+
+constructor EchoServer.Create(const Service: IOService; const LocalEndpoint: IPEndpoint);
+begin
+  inherited Create;
+
+  FAcceptor := NewTCPAcceptor(Service, LocalEndpoint);
+  FPeerSocket := NewTCPSocket(Service);
+
+  FAcceptor.AsyncAccept(FPeerSocket, HandleAccept);
+end;
+
+procedure EchoServer.HandleAccept(const ErrorCode: IOErrorCode);
+begin
+  if (ErrorCode) then
+    RaiseLastOSError(ErrorCode.Value);
+
+  WriteLn('Client connected');
+  WriteLn('Local endpoint: ' + FPeerSocket.LocalEndpoint);
+  WriteLn('Remote endpoint: ' + FPeerSocket.RemoteEndpoint);
+  WriteLn('Receiving echo request');
+
+  FData := nil;
+  SetLength(FData, 512);
+
+  FPeerSocket.AsyncReceive(FData, HandleRead);
+end;
+
+procedure EchoServer.HandleRead(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64);
+begin
+  if (ErrorCode) then
+    RaiseLastOSError(ErrorCode.Value);
+
+  WriteLn(Format('Received %d bytes', [BytesTransferred]));
+
+  SetLength(FData, BytesTransferred);
+
+  // use stream to write result so we reply it all
+  FStream := NewAsyncSocketStream(FPeerSocket);
+
+  AsyncWrite(FStream, FData, TransferAll(), HandleWrite);
+end;
+
+procedure EchoServer.HandleWrite(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64);
+begin
+  if (ErrorCode) then
+    RaiseLastOSError(ErrorCode.Value);
+
+  WriteLn(Format('Sent %d bytes', [BytesTransferred]));
+  WriteLn('Shutting down...');
+
+  // deviate from echo protocol, shut down once write completes
+  FPeerSocket.Shutdown();
+  FPeerSocket.Close();
+
+  FPeerSocket.Service.Stop;
 end;
 
 end.
