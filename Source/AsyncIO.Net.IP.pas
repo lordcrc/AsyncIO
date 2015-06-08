@@ -119,48 +119,6 @@ type
     function ToString(): string;
   end;
 
-  IPEndpoint = record
-  strict private
-    function GetAddress: IPAddress;
-    procedure SetAddress(const Value: IPAddress);
-    function GetPort: UInt16;
-    procedure SetPort(const Value: UInt16);
-    function GetIsIPv4: boolean;
-    function GetIsIPv6: boolean;
-    function GetData: Pointer;
-    function GetDataLength: integer;
-  private
-    class function Create(const Family: IPAddressFamily; const Port: UInt16): IPEndpoint; overload; static;
-    class function Create(const Address: IPAddress; const Port: UInt16): IPEndpoint; overload; static;
-    class function Create(const SocketAddress4: PSockAddrIn; const AddressLength: NativeUInt): IPEndpoint; overload; static;
-    class function Create(const SocketAddress6: PSockAddrIn6; const AddressLength: NativeUInt): IPEndpoint; overload; static;
-  public
-    class operator Implicit(const Endpoint: IPEndpoint): string;
-    class operator Equal(const Endpoint1, Endpoint2: IPEndpoint): boolean;
-    class operator NotEqual(const Endpoint1, Endpoint2: IPEndpoint): boolean;
-    
-    class function FromData(const Data; const DataLength: integer): IPEndpoint; static;
-
-    property Address: IPAddress read GetAddress write SetAddress;
-    property Port: UInt16 read GetPort write SetPort;
-
-    property IsIPv4: boolean read GetIsIPv4;
-    property IsIPv6: boolean read GetIsIPv6;
-
-    property Data: Pointer read GetData;
-    property DataLength: integer read GetDataLength;
-  strict private
-    case integer of
-      0: (FBase: TSockAddrStorage);
-      1: (Fv4: sockaddr_in);
-      2: (Fv6: SOCKADDR_IN6_W2KSP1);
-  end;
-
-function Endpoint(): IPEndpoint; overload; inline;
-function Endpoint(const Family: IPAddressFamily; PortNumber: UInt16): IPEndpoint; overload; inline;
-function Endpoint(const Address: IPAddress; const PortNumber: UInt16): IPEndpoint; overload; inline;
-
-type
   IPProtocol = record
   strict private
     FFamily: IPAddressFamily;
@@ -187,6 +145,8 @@ type
     class function ICMP: ICMPProtocol; static;
     class function TCP: TCPProtocol; static;
     class function UDP: UDPProtocol; static;
+    class function v4: IPProtocol; static;
+    class function v6: IPProtocol; static;
     class function Unspecified: IPProtocol; static;
 
     class operator Equal(const Protocol1, Protocol2: IPProtocol): boolean;
@@ -199,6 +159,52 @@ type
     property Protocol: integer read FProtocol;
   end;
 
+type
+  IPEndpoint = record
+  strict private
+    function GetAddress: IPAddress;
+    procedure SetAddress(const Value: IPAddress);
+    function GetPort: UInt16;
+    procedure SetPort(const Value: UInt16);
+    function GetIsIPv4: boolean;
+    function GetIsIPv6: boolean;
+    function GetProtocol: IPProtocol;
+    function GetData: Pointer;
+    function GetDataLength: integer;
+  private
+    class function Create(const Family: IPAddressFamily; const Port: UInt16): IPEndpoint; overload; static;
+    class function Create(const Address: IPAddress; const Port: UInt16): IPEndpoint; overload; static;
+    class function Create(const SocketAddress4: PSockAddrIn; const AddressLength: NativeUInt): IPEndpoint; overload; static;
+    class function Create(const SocketAddress6: PSockAddrIn6; const AddressLength: NativeUInt): IPEndpoint; overload; static;
+  public
+    class operator Implicit(const Endpoint: IPEndpoint): string;
+    class operator Equal(const Endpoint1, Endpoint2: IPEndpoint): boolean;
+    class operator NotEqual(const Endpoint1, Endpoint2: IPEndpoint): boolean;
+    
+    class function FromData(const Data; const DataLength: integer): IPEndpoint; static;
+
+    property Address: IPAddress read GetAddress write SetAddress;
+    property Port: UInt16 read GetPort write SetPort;
+
+    property IsIPv4: boolean read GetIsIPv4;
+    property IsIPv6: boolean read GetIsIPv6;
+
+    property Protocol: IPProtocol read GetProtocol;
+
+    property Data: Pointer read GetData;
+    property DataLength: integer read GetDataLength;
+  strict private
+    case integer of
+      0: (FBase: TSockAddrStorage);
+      1: (Fv4: sockaddr_in);
+      2: (Fv6: SOCKADDR_IN6_W2KSP1);
+  end;
+
+function Endpoint(): IPEndpoint; overload; inline;
+function Endpoint(const Family: IPAddressFamily; PortNumber: UInt16): IPEndpoint; overload; inline;
+function Endpoint(const Address: IPAddress; const PortNumber: UInt16): IPEndpoint; overload; inline;
+
+type
   ResolveFlag = (
     ResolvePassive,
     ResolveCannonicalName,
@@ -772,6 +778,139 @@ begin
   result.FValue := AF_INET6;
 end;
 
+{ IPProtocol }
+
+class operator IPProtocol.Equal(const Protocol1, Protocol2: IPProtocol): boolean;
+begin
+  result :=
+    (Protocol1.Protocol = Protocol2.Protocol) and
+    (Protocol1.SocketType = Protocol2.SocketType) and
+    (Protocol1.Family = Protocol2.Family);
+end;
+
+class function IPProtocol.ICMP: ICMPProtocol;
+begin
+  // just a helper
+end;
+
+class operator IPProtocol.NotEqual(const Protocol1, Protocol2: IPProtocol): boolean;
+begin
+  result := not (Protocol1 = Protocol2);
+end;
+
+class function IPProtocol.TCP: TCPProtocol;
+begin
+  // just a helper
+end;
+
+function IPProtocol.ToString: string;
+begin
+  case FProtocol of
+    IPPROTO_IP: result := 'IP';
+    IPPROTO_ICMP: result := 'ICMP';
+    IPPROTO_TCP: result := 'TCP';
+    IPPROTO_UDP: result := 'UDP';
+  else
+    raise EInvalidArgument.CreateFmt('IPProtocol.ToString: Unknown protocol %d', [FProtocol]);
+  end;
+  result := result + '/' + Family.ToString;
+end;
+
+class function IPProtocol.UDP: UDPProtocol;
+begin
+  // just a helper
+end;
+
+class function IPProtocol.Unspecified: IPProtocol;
+begin
+  result.FFamily := IPAddressFamily.Unspecified;
+  result.FSocketType := 0;
+  result.FProtocol := IPPROTO_IP;
+end;
+
+class function IPProtocol.v4: IPProtocol;
+begin
+  result.FFamily := IPAddressFamily.v4;
+  result.FSocketType := 0;
+  result.FProtocol := IPPROTO_IP;
+end;
+
+class function IPProtocol.v6: IPProtocol;
+begin
+  result.FFamily := IPAddressFamily.v6;
+  result.FSocketType := 0;
+  result.FProtocol := IPPROTO_IP;
+end;
+
+{ IPProtocol.ICMPProtocol }
+
+class function IPProtocol.ICMPProtocol.Unspecified: IPProtocol;
+begin
+  result.FFamily := IPAddressFamily.Unspecified;
+  result.FSocketType := SOCK_RAW;
+  result.FProtocol := IPPROTO_ICMP;
+end;
+
+class function IPProtocol.ICMPProtocol.v4: IPProtocol;
+begin
+  result.FFamily := IPAddressFamily.v4;
+  result.FSocketType := SOCK_RAW;
+  result.FProtocol := IPPROTO_ICMP;
+end;
+
+class function IPProtocol.ICMPProtocol.v6: IPProtocol;
+begin
+  result.FFamily := IPAddressFamily.v6;
+  result.FSocketType := SOCK_RAW;
+  result.FProtocol := IPPROTO_ICMP;
+end;
+
+{ IPProtocol.TCPProtocol }
+
+class function IPProtocol.TCPProtocol.Unspecified: IPProtocol;
+begin
+  result.FFamily := IPAddressFamily.Unspecified;
+  result.FSocketType := SOCK_STREAM;
+  result.FProtocol := IPPROTO_TCP;
+end;
+
+class function IPProtocol.TCPProtocol.v4: IPProtocol;
+begin
+  result.FFamily := IPAddressFamily.v4;
+  result.FSocketType := SOCK_STREAM;
+  result.FProtocol := IPPROTO_TCP;
+end;
+
+class function IPProtocol.TCPProtocol.v6: IPProtocol;
+begin
+  result.FFamily := IPAddressFamily.v6;
+  result.FSocketType := SOCK_STREAM;
+  result.FProtocol := IPPROTO_TCP;
+end;
+
+{ IPProtocol.UDPProtocol }
+
+class function IPProtocol.UDPProtocol.Unspecified: IPProtocol;
+begin
+  result.FFamily := IPAddressFamily.Unspecified;
+  result.FSocketType := SOCK_DGRAM;
+  result.FProtocol := IPPROTO_UDP;
+end;
+
+class function IPProtocol.UDPProtocol.v4: IPProtocol;
+begin
+  result.FFamily := IPAddressFamily.v4;
+  result.FSocketType := SOCK_DGRAM;
+  result.FProtocol := IPPROTO_UDP;
+end;
+
+class function IPProtocol.UDPProtocol.v6: IPProtocol;
+begin
+  result.FFamily := IPAddressFamily.v4;
+  result.FSocketType := SOCK_DGRAM;
+  result.FProtocol := IPPROTO_UDP;
+end;
+
 function Endpoint(): IPEndpoint;
 begin
   result := IPEndpoint.Create(IPv4Address.Any, 0);
@@ -913,6 +1052,14 @@ begin
     result := ntohs(Fv6.sin6_port);
 end;
 
+function IPEndpoint.GetProtocol: IPProtocol;
+begin
+  if (IsIPv4) then
+    result := IPProtocol.v4
+  else // if (IsIPv6) then
+    result := IPProtocol.v6;
+end;
+
 class operator IPEndpoint.Implicit(const Endpoint: IPEndpoint): string;
 var
   s: string;
@@ -957,132 +1104,12 @@ begin
   end;
 end;
 
-
 procedure IPEndpoint.SetPort(const Value: UInt16);
 begin
   if (IsIPv4) then
     Fv4.sin_port := htons(Value)
   else //if (IsIPv6) then
     Fv6.sin6_port := htons(Value);
-end;
-
-{ IPProtocol }
-
-class operator IPProtocol.Equal(const Protocol1, Protocol2: IPProtocol): boolean;
-begin
-  result :=
-    (Protocol1.Protocol = Protocol2.Protocol) and
-    (Protocol1.SocketType = Protocol2.SocketType) and
-    (Protocol1.Family = Protocol2.Family);
-end;
-
-class function IPProtocol.ICMP: ICMPProtocol;
-begin
-  // just a helper
-end;
-
-class operator IPProtocol.NotEqual(const Protocol1, Protocol2: IPProtocol): boolean;
-begin
-  result := not (Protocol1 = Protocol2);
-end;
-
-class function IPProtocol.TCP: TCPProtocol;
-begin
-  // just a helper
-end;
-
-function IPProtocol.ToString: string;
-begin
-  case FProtocol of
-    IPPROTO_IP: result := 'IP';
-    IPPROTO_ICMP: result := 'ICMP';
-    IPPROTO_TCP: result := 'TCP';
-    IPPROTO_UDP: result := 'UDP';
-  else
-    raise EInvalidArgument.CreateFmt('IPProtocol.ToString: Unknown protocol %d', [FProtocol]);
-  end;
-  result := result + '/' + Family.ToString;
-end;
-
-class function IPProtocol.UDP: UDPProtocol;
-begin
-  // just a helper
-end;
-
-class function IPProtocol.Unspecified: IPProtocol;
-begin
-  result.FFamily := IPAddressFamily.Unspecified;
-  result.FSocketType := 0;
-  result.FProtocol := IPPROTO_IP;
-end;
-
-{ IPProtocol.ICMPProtocol }
-
-class function IPProtocol.ICMPProtocol.Unspecified: IPProtocol;
-begin
-  result.FFamily := IPAddressFamily.Unspecified;
-  result.FSocketType := SOCK_RAW;
-  result.FProtocol := IPPROTO_ICMP;
-end;
-
-class function IPProtocol.ICMPProtocol.v4: IPProtocol;
-begin
-  result.FFamily := IPAddressFamily.v4;
-  result.FSocketType := SOCK_RAW;
-  result.FProtocol := IPPROTO_ICMP;
-end;
-
-class function IPProtocol.ICMPProtocol.v6: IPProtocol;
-begin
-  result.FFamily := IPAddressFamily.v6;
-  result.FSocketType := SOCK_RAW;
-  result.FProtocol := IPPROTO_ICMP;
-end;
-
-{ IPProtocol.TCPProtocol }
-
-class function IPProtocol.TCPProtocol.Unspecified: IPProtocol;
-begin
-  result.FFamily := IPAddressFamily.Unspecified;
-  result.FSocketType := SOCK_STREAM;
-  result.FProtocol := IPPROTO_TCP;
-end;
-
-class function IPProtocol.TCPProtocol.v4: IPProtocol;
-begin
-  result.FFamily := IPAddressFamily.v4;
-  result.FSocketType := SOCK_STREAM;
-  result.FProtocol := IPPROTO_TCP;
-end;
-
-class function IPProtocol.TCPProtocol.v6: IPProtocol;
-begin
-  result.FFamily := IPAddressFamily.v6;
-  result.FSocketType := SOCK_STREAM;
-  result.FProtocol := IPPROTO_TCP;
-end;
-
-{ IPProtocol.UDPProtocol }
-
-class function IPProtocol.UDPProtocol.Unspecified: IPProtocol;
-begin
-  result.FFamily := IPAddressFamily.Unspecified;
-  result.FSocketType := SOCK_DGRAM;
-  result.FProtocol := IPPROTO_UDP;
-end;
-
-class function IPProtocol.UDPProtocol.v4: IPProtocol;
-begin
-  result.FFamily := IPAddressFamily.v4;
-  result.FSocketType := SOCK_DGRAM;
-  result.FProtocol := IPPROTO_UDP;
-end;
-
-class function IPProtocol.UDPProtocol.v6: IPProtocol;
-begin
-  result.FFamily := IPAddressFamily.v4;
-  result.FSocketType := SOCK_DGRAM;
-  result.FProtocol := IPPROTO_UDP;
 end;
 
 function Query(const Protocol: IPProtocol; const Host, Service: string; const Flags: ResolveFlags): IPResolver.Query;
