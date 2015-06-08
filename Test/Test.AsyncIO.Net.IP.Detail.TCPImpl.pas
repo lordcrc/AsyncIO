@@ -154,6 +154,7 @@ begin
     begin
       HandlerExecuted := True;
       CheckEquals(IOErrorCode.Success, ErrorCode, 'AsyncConnect failed');
+      CheckEquals(PeerEndpoint, FTCPSocketImpl.RemoteEndpoint, 'Wrong remote endpoint');
     end;
 
   FTCPSocketImpl.AsyncConnect(PeerEndpoint, Handler);
