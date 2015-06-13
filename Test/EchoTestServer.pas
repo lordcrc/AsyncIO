@@ -3,7 +3,7 @@ unit EchoTestServer;
 interface
 
 uses
-  System.SysUtils, AsyncIO.Net.IP;
+  System.SysUtils;
 
 type
   IEchoTestServer = interface
