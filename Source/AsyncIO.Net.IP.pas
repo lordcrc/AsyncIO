@@ -230,7 +230,7 @@ type
   public
     type
       TAddressInfo = ADDRINFOEXW;
-      PAddressInfo = ^ADDRINFOEXW;
+      PAddressInfo = PADDRINFOEXW;
       Query = record
       strict private
         FHints: TAddressInfo;
@@ -1330,7 +1330,8 @@ begin
   try
     result := Results.Create(ResolveQuery.HostName, ResolveQuery.ServiceName, addr);
   finally
-    FreeAddrInfoEx(PADDRINFOEXA(addr));
+//    FreeAddrInfoEx(PADDRINFOEXA(addr));
+    FreeAddrInfoEx(addr);
   end;
 end;
 
