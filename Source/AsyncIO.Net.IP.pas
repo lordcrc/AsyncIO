@@ -173,6 +173,7 @@ type
     function GetDataLength: integer;
   private
     class function Create(const Family: IPAddressFamily; const Port: UInt16): IPEndpoint; overload; static;
+    class function Create(const Protocol: IPProtocol; const Port: UInt16): IPEndpoint; overload; static;
     class function Create(const Address: IPAddress; const Port: UInt16): IPEndpoint; overload; static;
     class function Create(const SocketAddress4: PSockAddrIn; const AddressLength: NativeUInt): IPEndpoint; overload; static;
     class function Create(const SocketAddress6: PSockAddrIn6; const AddressLength: NativeUInt): IPEndpoint; overload; static;
@@ -194,6 +195,7 @@ type
     property Data: Pointer read GetData;
     property DataLength: integer read GetDataLength;
   strict private
+    FProtocol: IPProtocol;
     case integer of
       0: (FBase: TSockAddrStorage);
       1: (Fv4: sockaddr_in);
@@ -202,6 +204,7 @@ type
 
 function Endpoint(): IPEndpoint; overload; inline;
 function Endpoint(const Family: IPAddressFamily; PortNumber: UInt16): IPEndpoint; overload; inline;
+function Endpoint(const Protocol: IPProtocol; PortNumber: UInt16): IPEndpoint; overload; inline;
 function Endpoint(const Address: IPAddress; const PortNumber: UInt16): IPEndpoint; overload; inline;
 
 type
@@ -952,6 +955,11 @@ begin
   result := IPEndpoint.Create(Family, PortNumber);
 end;
 
+function Endpoint(const Protocol: IPProtocol; PortNumber: UInt16): IPEndpoint;
+begin
+  result := IPEndpoint.Create(Protocol, PortNumber);
+end;
+
 function Endpoint(const Address: IPAddress; const PortNumber: UInt16): IPEndpoint;
 begin
   result := IPEndpoint.Create(Address, PortNumber);
@@ -968,6 +976,7 @@ begin
     result.Fv4.sin_family := IPAddressFamily.v4;
     result.Fv4.sin_port := htons(Port);
     result.Fv4.sin_addr.S_addr := htonl(IPv4Address.Any.Data);
+    result.FProtocol := IPProtocol.v4;
   end
   else
   begin
@@ -977,6 +986,7 @@ begin
     //result.Fv6.sin6_flowinfo := 0;
     //FillChar(result.Fv6.sin6_addr.s6_bytes[0], 16, 0);
     //result.Fv6.sin6_scope_id := 0;
+    result.FProtocol := IPProtocol.v6;
   end;
 end;
 
@@ -986,6 +996,14 @@ begin
   FillChar(result, SizeOf(result), 0);
   result.Address := Address;
   result.Port := Port;
+  if (Address.IsIPv4) then
+  begin
+    result.FProtocol := IPProtocol.v4;
+  end
+  else
+  begin
+    result.FProtocol := IPProtocol.v6;
+  end;
 end;
 
 class function IPEndpoint.Create(const SocketAddress4: PSockAddrIn;
@@ -996,6 +1014,7 @@ begin
 
   FillChar(result, SizeOf(result), 0);
   Move(SocketAddress4^, result.Fv4, SizeOf(result.Fv4));
+  result.FProtocol := IPProtocol.v4;
 end;
 
 class function IPEndpoint.Create(const SocketAddress6: PSockAddrIn6;
@@ -1006,6 +1025,14 @@ begin
 
   FillChar(result, SizeOf(result), 0);
   Move(SocketAddress6^, result.Fv6, Min(AddressLength, SizeOf(result.Fv6)));
+  result.FProtocol := IPProtocol.v6;
+end;
+
+class function IPEndpoint.Create(const Protocol: IPProtocol;
+  const Port: UInt16): IPEndpoint;
+begin
+  result := IPEndpoint.Create(Protocol.Family, Port);
+  result.FProtocol := Protocol;
 end;
 
 class operator IPEndpoint.Equal(const Endpoint1, Endpoint2: IPEndpoint): boolean;
@@ -1085,10 +1112,7 @@ end;
 
 function IPEndpoint.GetProtocol: IPProtocol;
 begin
-  if (IsIPv4) then
-    result := IPProtocol.v4
-  else // if (IsIPv6) then
-    result := IPProtocol.v6;
+  result := FProtocol;
 end;
 
 class operator IPEndpoint.Implicit(const Endpoint: IPEndpoint): string;
