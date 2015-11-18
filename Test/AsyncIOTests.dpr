@@ -15,8 +15,10 @@ program AsyncIOTests;
 {$ENDIF}
 
 uses
+{$IFDEF TESTINSIGHT}
   TestInsight.Client,
   TestInsight.DUnit,
+{$ENDIF}
   DUnitTestRunner,
   RegularExpr.Detail in '..\..\RegularExpr\RegularExpr.Detail.pas',
   RegularExpr in '..\..\RegularExpr\RegularExpr.pas',
@@ -39,10 +41,12 @@ uses
   Test.AsyncIO.Detail in 'Test.AsyncIO.Detail.pas',
   Test.AsyncIO.Net.IP in 'Test.AsyncIO.Net.IP.pas',
   Test.AsyncIO.Net.IP.Detail.TCPImpl in 'Test.AsyncIO.Net.IP.Detail.TCPImpl.pas',
-  Test.AsyncIO.Net.IP.Detail in 'Test.AsyncIO.Net.IP.Detail.pas';
+  Test.AsyncIO.Net.IP.Detail in 'Test.AsyncIO.Net.IP.Detail.pas',
+  EchoTestClient in 'EchoTestClient.pas';
 
 {$R *.RES}
 
+{$IFDEF TESTINSIGHT}
 function IsTestInsightRunning: Boolean;
 var
   client: ITestInsightClient;
@@ -57,6 +61,10 @@ begin
     TestInsight.DUnit.RunRegisteredTests
   else
     DUnitTestRunner.RunRegisteredTests;
+{$ELSE}
+begin
+  DUnitTestRunner.RunRegisteredTests;
+{$ENDIF}
 end.
 
 

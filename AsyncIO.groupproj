@@ -15,6 +15,9 @@
         <Projects Include="Examples\TCPEcho\AsyncEchoClient.dproj">
             <Dependencies/>
         </Projects>
+        <Projects Include="Examples\HTTP\AsyncHttpClient.dproj">
+            <Dependencies/>
+        </Projects>
     </ItemGroup>
     <ProjectExtensions>
         <Borland.Personality>Default.Personality.12</Borland.Personality>
@@ -59,14 +62,23 @@
     <Target Name="AsyncEchoClient:Make">
         <MSBuild Projects="Examples\TCPEcho\AsyncEchoClient.dproj" Targets="Make"/>
     </Target>
+    <Target Name="AsyncHttpClient">
+        <MSBuild Projects="Examples\HTTP\AsyncHttpClient.dproj"/>
+    </Target>
+    <Target Name="AsyncHttpClient:Clean">
+        <MSBuild Projects="Examples\HTTP\AsyncHttpClient.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="AsyncHttpClient:Make">
+        <MSBuild Projects="Examples\HTTP\AsyncHttpClient.dproj" Targets="Make"/>
+    </Target>
     <Target Name="Build">
-        <CallTarget Targets="AsyncIODev;AsyncIOTests;AsyncFileCopy;AsyncEchoClient"/>
+        <CallTarget Targets="AsyncIODev;AsyncIOTests;AsyncFileCopy;AsyncEchoClient;AsyncHttpClient"/>
     </Target>
     <Target Name="Clean">
-        <CallTarget Targets="AsyncIODev:Clean;AsyncIOTests:Clean;AsyncFileCopy:Clean;AsyncEchoClient:Clean"/>
+        <CallTarget Targets="AsyncIODev:Clean;AsyncIOTests:Clean;AsyncFileCopy:Clean;AsyncEchoClient:Clean;AsyncHttpClient:Clean"/>
     </Target>
     <Target Name="Make">
-        <CallTarget Targets="AsyncIODev:Make;AsyncIOTests:Make;AsyncFileCopy:Make;AsyncEchoClient:Make"/>
+        <CallTarget Targets="AsyncIODev:Make;AsyncIOTests:Make;AsyncFileCopy:Make;AsyncEchoClient:Make;AsyncHttpClient:Make"/>
     </Target>
     <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
 </Project>
