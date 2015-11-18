@@ -275,7 +275,7 @@ begin
   headers := reader.ReadUntil(#13#10#13#10);
 
   // read response data
-  SetLength(responseData, FResponseBuffer.BufferSize - reader.Stream.Position);
+  SetLength(responseData, reader.Stream.Size - reader.Stream.Position);
   reader.Stream.ReadBuffer(responseData, Length(responseData));
 
   HandleResponse(headers, responseData);
