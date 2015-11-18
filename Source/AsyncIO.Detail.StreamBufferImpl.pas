@@ -168,9 +168,12 @@ begin
   if (FPosition >= FStreamBuffer.BufferSize) then
     exit;
 
+  // non-consuming read
   data := PByte(FStreamBuffer.Data) + FPosition;
   len := Min(Int64(Count), FStreamBuffer.BufferSize - FPosition);
   Move(data^, Buffer, len);
+
+  FPosition := FPosition + len;
 
   result := len;
 end;
