@@ -126,7 +126,7 @@ begin
   SetLength(FBuffer, bufSize + Size);
 
   FCommitSize := Size;
-  FCommitPosition := Length(FBuffer);
+  FCommitPosition := bufSize;
 
   result := MakeBuffer(FBuffer, FCommitSize);
 end;
