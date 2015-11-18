@@ -96,7 +96,7 @@ function NewStreamReader(const Encoding: TEncoding; const Stream: TStream; const
 implementation
 
 uses
-  BufStreamReader;
+  BufStream, BufStreamReader;
 
 type
   StreamReaderImpl = class(TInterfacedObject, StreamReader)
