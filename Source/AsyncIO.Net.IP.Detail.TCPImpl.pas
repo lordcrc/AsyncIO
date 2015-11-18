@@ -518,7 +518,7 @@ end;
 procedure TTCPAcceptorImpl.Open(const Protocol: IPProtocol);
 begin
   if (Protocol.SocketType <> SOCK_STREAM) then
-    raise EArgumentException.Create('Invalid socket type in CreateSocket (TCP)');
+    raise EArgumentException.Create('Invalid socket type in Open (TCP)');
 
   if (SocketHandle <> INVALID_SOCKET) then
     raise EInvalidOpException.Create('Socket already allocated in Open (TCP)');
