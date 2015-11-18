@@ -12,7 +12,8 @@ unit Test.AsyncIO.Net.IP.Detail.TCPImpl;
 interface
 
 uses
-  TestFramework, AsyncIO.Net.IP.Detail.TCPImpl, AsyncIO.Net.IP, IdWinsock2, AsyncIO, NetTestCase, EchoTestServer;
+  TestFramework, AsyncIO.Net.IP.Detail.TCPImpl, AsyncIO.Net.IP, IdWinsock2, AsyncIO, NetTestCase,
+  EchoTestServer, EchoTestClient;
 
 type
   // Test methods for class TTCPSocketImpl
@@ -41,11 +42,31 @@ type
     procedure TestAsyncSend;
     procedure TestAsyncReceive;
   end;
+  // Test methods for class TTCPAcceptorImpl
+
+  TestTTCPAcceptorImpl = class(TNetTestCase)
+  strict private
+    FTestClient: IEchoTestClient;
+    FService: IOService;
+  public
+    procedure SetUp; override;
+    procedure TearDown; override;
+  published
+    procedure TestGetService;
+    procedure TestGetProtocol;
+    procedure TestGetLocalEndpoint;
+    procedure TestGetIsOpen;
+    procedure TestAsyncAccept;
+    procedure TestOpen;
+    procedure TestBind;
+    procedure TestListen;
+    procedure TestClose;
+  end;
 
 implementation
 
 uses
-  System.SysUtils, AsyncIO.ErrorCodes;
+  System.SysUtils, AsyncIO.ErrorCodes, System.Threading, IdStack;
 
 procedure TestTTCPSocketImpl.SetUp;
 begin
@@ -366,8 +387,180 @@ begin
   CheckEqualsMem(SrcData, RecvData, Length(SrcData), 'Read data does not match written data');
 end;
 
+{ TestTTCPAcceptorImpl }
+
+procedure TestTTCPAcceptorImpl.SetUp;
+begin
+  FTestClient := NewEchoTestClient('::1', 7);
+  FService := NewIOService();
+end;
+
+procedure TestTTCPAcceptorImpl.TearDown;
+begin
+  FTestClient := nil;
+  FService := nil;
+end;
+
+procedure TestTTCPAcceptorImpl.TestAsyncAccept;
+var
+  Data: string;
+  TCPAcceptorImpl: IPAcceptor;
+  PeerSocket: IPSocket;
+  Handler: OpHandler;
+  ReturnValue: IFuture<string>;
+  HandlerExecuted: boolean;
+begin
+  Data := 'This is a test string';
+
+  TCPAcceptorImpl := NewTCPAcceptor(FService, Endpoint(IPProtocol.TCP.v6, 7));
+
+  PeerSocket := NewTCPSocket(FService);
+
+  HandlerExecuted := False;
+  Handler :=
+    procedure(const ErrorCode: IOErrorCode)
+    begin
+      HandlerExecuted := True;
+      CheckEquals(IOErrorCode.Success, ErrorCode, 'Failed to accept connection');
+      PeerSocket.Close;
+    end;
+
+  TCPAcceptorImpl.AsyncAccept(PeerSocket, Handler);
+
+  ReturnValue := FTestClient.ConnectAndSend(Data);
+
+  FService.RunOne;
+
+  try
+    ReturnValue.Wait(5000);
+    Fail('Client failed to error on socket being closed during sending');
+  except
+    on E: Exception do
+      Check((E is EAggregateException)
+        and (EAggregateException(E).InnerExceptions[0] is EIdSocketError)
+        and (EIdSocketError(EAggregateException(E).InnerExceptions[0]).LastError = 10054), 'Error while connecting client');
+  end;
+
+  CheckTrue(HandlerExecuted, 'Failed to execute accept handler');
+end;
+
+procedure TestTTCPAcceptorImpl.TestBind;
+var
+  Endp: IPEndpoint;
+  TCPAcceptorImpl: IPAcceptor;
+  TCPSocket: IPSocket;
+begin
+  Endp := Endpoint(IPProtocol.TCP.v6,  7);
+
+  TCPAcceptorImpl := NewTCPAcceptor(FService);
+  TCPAcceptorImpl.Open(Endp.Protocol);
+  TCPAcceptorImpl.Bind(Endp);
+
+  TCPSocket := NewTCPSocket(FService);
+  try
+    TCPSocket.Bind(Endp);
+    Fail('Binding socket to same endpoint as acceptor failed to raise exception');
+  except
+    on E: Exception do CheckIs(E, EOSError, 'Binding socket to same endpoint as acceptor failed to raise OS error');
+  end;
+end;
+
+procedure TestTTCPAcceptorImpl.TestClose;
+var
+  Endp: IPEndpoint;
+  TCPAcceptorImpl: IPAcceptor;
+begin
+  Endp := Endpoint(IPAddressFamily.v6,  7);
+
+  TCPAcceptorImpl := NewTCPAcceptor(FService, Endp);
+
+  CheckTrue(TCPAcceptorImpl.IsOpen, 'Close 1');
+
+  TCPAcceptorImpl.Close();
+
+  CheckFalse(TCPAcceptorImpl.IsOpen, 'Close 2');
+end;
+
+procedure TestTTCPAcceptorImpl.TestGetIsOpen;
+var
+  Endp: IPEndpoint;
+  TCPAcceptorImpl: IPAcceptor;
+begin
+  Endp := Endpoint(IPProtocol.TCP.v6,  7);
+
+  TCPAcceptorImpl := NewTCPAcceptor(FService);
+
+  CheckFalse(TCPAcceptorImpl.IsOpen, 'IsOpen 1');
+
+  TCPAcceptorImpl.Open(Endp.Protocol);
+
+  CheckTrue(TCPAcceptorImpl.IsOpen, 'IsOpen 2');
+end;
+
+procedure TestTTCPAcceptorImpl.TestGetLocalEndpoint;
+var
+  Endp: IPEndpoint;
+  TCPAcceptorImpl: IPAcceptor;
+begin
+  Endp := Endpoint(IPAddressFamily.v6,  7);
+  TCPAcceptorImpl := NewTCPAcceptor(FService);
+
+  try
+    TCPAcceptorImpl.LocalEndpoint;
+    Fail('Failed to raise exception on unbound socket');
+  except
+    on E: Exception do CheckIs(E, EOSError, 'Failed to raise OS error for unbound socket');
+  end;
+
+  TCPAcceptorImpl.Bind(Endp);
+
+  CheckEquals(Endp, TCPAcceptorImpl.LocalEndpoint, 'Wrong local endpoint');
+end;
+
+procedure TestTTCPAcceptorImpl.TestGetProtocol;
+var
+  Endp: IPEndpoint;
+  TCPAcceptorImpl: IPAcceptor;
+begin
+  Endp := Endpoint(IPProtocol.TCP.v6,  7);
+  TCPAcceptorImpl := NewTCPAcceptor(FService, Endp);
+
+  CheckEquals(Endp.Protocol, TCPAcceptorImpl.Protocol);
+end;
+
+procedure TestTTCPAcceptorImpl.TestGetService;
+var
+  Endp: IPEndpoint;
+  TCPAcceptorImpl: IPAcceptor;
+begin
+  Endp := Endpoint(IPAddressFamily.v6,  7);
+  TCPAcceptorImpl := NewTCPAcceptor(FService, Endp);
+
+  CheckSame(FService, TCPAcceptorImpl.Service);
+end;
+
+procedure TestTTCPAcceptorImpl.TestListen;
+begin
+  // TODO - use getsocketopt with SO_ACCEPTCONN
+end;
+
+procedure TestTTCPAcceptorImpl.TestOpen;
+var
+  Protocol: IPProtocol;
+  TCPAcceptorImpl: IPAcceptor;
+begin
+  Protocol := IPProtocol.TCP.v6;
+  TCPAcceptorImpl := NewTCPAcceptor(FService);
+  TCPAcceptorImpl.Open(Protocol);
+
+  CheckTrue(TCPAcceptorImpl.IsOpen);
+
+  // use
+end;
+
 initialization
   // Register any test cases with the test runner
   RegisterTest(TestTTCPSocketImpl.Suite);
+  RegisterTest(TestTTCPAcceptorImpl.Suite);
 end.
 
