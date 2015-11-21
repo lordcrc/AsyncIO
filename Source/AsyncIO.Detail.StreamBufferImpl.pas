@@ -128,7 +128,7 @@ begin
   FCommitSize := Size;
   FCommitPosition := bufSize;
 
-  result := MakeBuffer(FBuffer, FCommitSize);
+  result := MakeBuffer(@FBuffer[FCommitPosition], FCommitSize);
 end;
 
 function StreamBufferImpl.PrepareConsume(const Size: UInt32): MemoryBuffer;
@@ -218,6 +218,8 @@ begin
   Move(Buffer, buf.Data^, Count);
 
   FStreamBuffer.Commit(Count);
+
+  FPosition := FPosition + Count;
 
   result := Count;
 end;
