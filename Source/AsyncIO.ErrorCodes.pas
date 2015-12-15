@@ -34,6 +34,7 @@ type
 
     class function Success: IOErrorCode; static;
     class function EndOfFile: IOErrorCode; static;
+    class function OperationAborted: IOErrorCode; static;
 
     class operator Implicit(const ec: IOErrorCode): boolean;
     class operator Equal(const A: IOErrorCode; const B: IOErrorCode): boolean;
@@ -130,6 +131,11 @@ end;
 class operator IOErrorCode.NotEqual(const A, B: IOErrorCode): boolean;
 begin
   result := A.FErrorCode <> B.FErrorCode;
+end;
+
+class function IOErrorCode.OperationAborted: IOErrorCode;
+begin
+  result := IOErrorCode.Create(ERROR_OPERATION_ABORTED);
 end;
 
 class function IOErrorCode.Success: IOErrorCode;

@@ -3,7 +3,7 @@ unit AsyncIO.Detail;
 interface
 
 uses
-  WinAPI.Windows, System.Classes, AsyncIO, AsyncIO.ErrorCodes;
+  WinAPI.Windows, System.SysUtils, System.Classes, AsyncIO, AsyncIO.ErrorCodes;
 
 type
   IOCPContext  = class
@@ -117,6 +117,22 @@ type
     property Service: IOService read FService;
   end;
 
+  AsyncMemoryStreamImpl = class(AsyncStreamImplBase, AsyncMemoryStream)
+  strict private
+    FData: TBytes;
+    FOffset: UInt64;
+  public
+    constructor Create(const Service: IOService; const Data: TBytes);
+    destructor Destroy; override;
+
+    function GetData: TBytes;
+
+    procedure AsyncReadSome(const Buffer: MemoryBuffer; const Handler: IOHandler); override;
+    procedure AsyncWriteSome(const Buffer: MemoryBuffer; const Handler: IOHandler); override;
+
+    property Data: TBytes read FData;
+  end;
+
   AsyncHandleStreamImpl = class(AsyncStreamImplBase, AsyncHandleStream)
   strict private
     FHandle: THandle;
@@ -136,7 +152,7 @@ type
 implementation
 
 uses
-  System.SysUtils, System.Math;
+  System.Math;
 
 {$POINTERMATH ON}
 
@@ -467,6 +483,85 @@ function AsyncStreamImplBase.GetService: IOService;
 begin
   result := FService;
 end;
+
+{ AsyncMemoryStreamImpl }
+
+procedure AsyncMemoryStreamImpl.AsyncReadSome(const Buffer: MemoryBuffer;
+  const Handler: IOHandler);
+var
+  ctx: IOHandlerContext;
+  remainingData: Int64;
+  bytesRead: UInt32;
+begin
+  ctx := IOHandlerContext.Create(Handler);
+
+  if (Length(Data) > 0) then
+  begin
+    remainingData := Length(Data) - FOffset;
+    bytesRead := Min(Buffer.Size, remainingData);
+  end
+  else
+  begin
+    bytesRead := 0;
+  end;
+
+  Move(Data[FOffset], Buffer.Data^, bytesRead);
+
+  FOffset := FOffset + bytesRead;
+
+  IOServicePostCompletion(Service, bytesRead, ctx);
+end;
+
+procedure AsyncMemoryStreamImpl.AsyncWriteSome(const Buffer: MemoryBuffer;
+  const Handler: IOHandler);
+var
+  ctx: IOHandlerContext;
+  bytesWritten: UInt32;
+  newSize: Int64;
+begin
+  ctx := IOHandlerContext.Create(Handler);
+
+  bytesWritten := Buffer.Size;
+
+  newSize := bytesWritten + FOffset;
+
+  if (newSize > Length(Data)) then
+  begin
+    try
+      SetLength(FData, newSize);
+    except
+      on E: EOutOfMemory do
+        bytesWritten := 0;
+    end;
+  end;
+
+  Move(Buffer.Data^, Data[FOffset], bytesWritten);
+
+  FOffset := FOffset + bytesWritten;
+
+  IOServicePostCompletion(Service, bytesWritten, ctx);
+end;
+
+constructor AsyncMemoryStreamImpl.Create(const Service: IOService;
+  const Data: TBytes);
+begin
+  inherited Create(Service);
+
+  FData := Data;
+end;
+
+destructor AsyncMemoryStreamImpl.Destroy;
+begin
+  FData := nil;
+
+  inherited;
+end;
+
+function AsyncMemoryStreamImpl.GetData: TBytes;
+begin
+  result := FData;
+end;
+
 
 { AsyncHandleStreamImpl }
 

@@ -19,3 +19,4 @@ __history
 *.stat
 TestInsightSettings.ini
 *.tvsconfig
+Examples/HTTP/www/

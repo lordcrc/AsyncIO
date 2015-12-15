@@ -122,6 +122,7 @@ type
   end;
 
   AsyncStream = interface
+    ['{B134C820-D282-4D7E-B1CB-53C16FCAE7C8}']
     {$REGION 'Property accessors'}
     function GetService: IOService;
     {$ENDREGION}
@@ -132,7 +133,17 @@ type
     property Service: IOService read GetService;
   end;
 
+  AsyncMemoryStream = interface(AsyncStream)
+    ['{7B9C1872-4983-4564-B5A9-101943910AE0}']
+    {$REGION 'Property accessors'}
+    function GetData: TBytes;
+    {$ENDREGION}
+
+    property Data: TBytes read GetData;
+  end;
+
   AsyncHandleStream = interface(AsyncStream)
+    ['{BBA2A04F-C0D5-4834-81AC-87D6AAB627AB}']
     {$REGION 'Property accessors'}
     function GetHandle: THandle;
     {$ENDREGION}
@@ -141,6 +152,7 @@ type
   end;
 
   AsyncFileStream = interface(AsyncHandleStream)
+    ['{011E1F49-4CF9-48FB-BEE5-4DF21E1EF1BB}']
     {$REGION 'Property accessors'}
     function GetFilename: string;
     {$ENDREGION}
@@ -153,6 +165,9 @@ type
 
 function MakeBuffer(const Buffer: MemoryBuffer; const MaxSize: cardinal): MemoryBuffer; overload;
 function MakeBuffer(const Data: pointer; const Size: cardinal): MemoryBuffer; overload;
+
+function NewAsyncMemoryStream(const Service: IOService; const Data: TBytes): AsyncMemoryStream; overload;
+function NewAsyncMemoryStream(const Service: IOService): AsyncMemoryStream; overload;
 
 var
   MaxTransferSize: UInt64 = 65536; // default
@@ -167,6 +182,7 @@ procedure AsyncReadUntil(const Stream: AsyncStream; const Buffer: StreamBuffer; 
 procedure AsyncReadUntil(const Stream: AsyncStream; const Buffer: StreamBuffer; const Delim: TArray<Byte>; const Handler: IOHandler); overload;
 
 procedure AsyncWrite(const Stream: AsyncStream; const Buffer: MemoryBuffer; const CompletionCondition: IOCompletionCondition; const Handler: IOHandler); overload;
+procedure AsyncWrite(const Stream: AsyncStream; const Buffer: StreamBuffer; const CompletionCondition: IOCompletionCondition; const Handler: IOHandler); overload;
 
 implementation
 
@@ -189,6 +205,16 @@ end;
 function MakeBuffer(const Data: pointer; const Size: cardinal): MemoryBuffer; overload;
 begin
   result := MemoryBuffer.Create(Data, Size);
+end;
+
+function NewAsyncMemoryStream(const Service: IOService; const Data: TBytes): AsyncMemoryStream;
+begin
+  result := AsyncMemoryStreamImpl.Create(Service, Data);
+end;
+
+function NewAsyncMemoryStream(const Service: IOService): AsyncMemoryStream;
+begin
+  result := NewAsyncMemoryStream(Service, nil);
 end;
 
 function TransferAll: IOCompletionCondition;
@@ -258,7 +284,7 @@ begin
 
   readMore := True;
 
-  if ((ErrorCode) or (BytesTransferred = 0)) then
+  if ((ErrorCode = IOErrorCode.Success) and (BytesTransferred = 0)) then
     readMore := False;
 
   n := FCompletionCondition(ErrorCode, FTotalBytesTransferred);
@@ -339,10 +365,11 @@ begin
 
   readMore := True;
 
-  if ((ErrorCode) or (BytesTransferred = 0)) then
+  if ((ErrorCode = IOErrorCode.Success) and (BytesTransferred = 0)) then
     readMore := False;
 
   n := FCompletionCondition(ErrorCode, FTotalBytesTransferred);
+  n := Min(n, FBuffer.MaxBufferSize - FBuffer.BufferSize);
   if (n = 0) then
     readMore := False;
 
@@ -364,6 +391,7 @@ var
   buf: MemoryBuffer;
 begin
   n := CompletionCondition(IOErrorCode.Success, 0);
+  n := Min(n, Buffer.MaxBufferSize);
 
   if (n = 0) then
   begin
@@ -628,6 +656,92 @@ begin
 
   writeOp := AsyncWriteOp.Create(Stream, Buffer, CompletionCondition, Handler);
   Stream.AsyncWriteSome(MakeBuffer(Buffer, n), writeOp);
+end;
+
+type
+  AsyncWriteStreamAdapterOp = class(TInterfacedObject, IOHandler)
+  strict private
+    FTotalBytesTransferred: UInt64;
+    FStream: AsyncStream;
+    FBuffer: StreamBuffer;
+    FCompletionCondition: IOCompletionCondition;
+    FHandler: IOHandler;
+
+    procedure Invoke(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64);
+  public
+    constructor Create(const Stream: AsyncStream; const Buffer: StreamBuffer; const CompletionCondition: IOCompletionCondition; const Handler: IOHandler);
+  end;
+
+{ AsyncWriteStreamAdapterOp }
+
+constructor AsyncWriteStreamAdapterOp.Create(const Stream: AsyncStream;
+  const Buffer: StreamBuffer; const CompletionCondition: IOCompletionCondition;
+  const Handler: IOHandler);
+begin
+  inherited Create;
+
+  FTotalBytesTransferred := 0;
+  FStream := Stream;
+  FBuffer := Buffer;
+  FCompletionCondition := CompletionCondition;
+  FHandler := Handler;
+end;
+
+procedure AsyncWriteStreamAdapterOp.Invoke(const ErrorCode: IOErrorCode;
+  const BytesTransferred: UInt64);
+var
+  n: UInt64;
+  readMore: boolean;
+  buf: MemoryBuffer;
+begin
+  FTotalBytesTransferred := FTotalBytesTransferred + BytesTransferred;
+
+  FBuffer.Consume(BytesTransferred);
+
+  readMore := True;
+
+  if ((ErrorCode) or (BytesTransferred = 0)) then
+    readMore := False;
+
+  n := FCompletionCondition(ErrorCode, FTotalBytesTransferred);
+  n := Min(n, FBuffer.BufferSize);
+  if (n = 0) then
+    readMore := False;
+
+  if (readMore) then
+  begin
+    buf := FBuffer.PrepareConsume(n);
+    FStream.AsyncWriteSome(buf, Self);
+  end
+  else
+  begin
+    FHandler(ErrorCode, FTotalBytesTransferred);
+  end;
+end;
+
+procedure AsyncWrite(const Stream: AsyncStream; const Buffer: StreamBuffer; const CompletionCondition: IOCompletionCondition; const Handler: IOHandler); overload;
+var
+  n: UInt64;
+  writeOp: IOHandler;
+  buf: MemoryBuffer;
+begin
+  n := CompletionCondition(IOErrorCode.Success, 0);
+  n := Min(n, Buffer.BufferSize);
+
+  if (n = 0) then
+  begin
+    Stream.Service.Post(
+      procedure
+      begin
+        Handler(IOErrorCode.Success, 0);
+      end
+    );
+    exit;
+  end;
+
+  writeOp := AsyncWriteStreamAdapterOp.Create(Stream, Buffer, CompletionCondition, Handler);
+  buf := Buffer.PrepareConsume(n);
+  Stream.AsyncWriteSome(buf, writeOp);
 end;
 
 { MemoryBuffer }
