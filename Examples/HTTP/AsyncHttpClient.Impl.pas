@@ -10,12 +10,12 @@ type
   HttpClientResponseHandler = reference to procedure(const Headers: string; const ResponseData: TBytes);
 
   AsyncHttpCli = interface
-  {$REGION Property accessors}
+    {$REGION 'Property accessors'}
     function GetService: IOService;
     function GetProgressHandler: HttpClientProgressHandler;
 
     procedure SetProgressHandler(const Value: HttpClientProgressHandler);
-  {$ENDREGION}
+    {$ENDREGION}
 
     procedure Get(const URL: string);
 
