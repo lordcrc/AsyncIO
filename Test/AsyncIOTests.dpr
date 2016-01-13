@@ -15,10 +15,10 @@ program AsyncIOTests;
 {$ENDIF}
 
 uses
-{$IFDEF TESTINSIGHT}
+  {$IFDEF TESTINSIGHT}
   TestInsight.Client,
   TestInsight.DUnit,
-{$ENDIF}
+  {$ENDIF }
   DUnitTestRunner,
   RegularExpr.Detail in '..\..\RegularExpr\RegularExpr.Detail.pas',
   RegularExpr in '..\..\RegularExpr\RegularExpr.pas',
@@ -27,7 +27,7 @@ uses
   EncodingHelper in '..\..\BufferedStreamReader\EncodingHelper.pas',
   AsyncIO.Detail in '..\Source\AsyncIO.Detail.pas',
   AsyncIO.Detail.StreamBufferImpl in '..\Source\AsyncIO.Detail.StreamBufferImpl.pas',
-  AsyncIO.ErrorCodes in '..\Source\AsyncIO.ErrorCodes.pas',
+  AsyncIO.OpResults in '..\Source\AsyncIO.OpResults.pas',
   AsyncIO.Filesystem.Detail in '..\Source\AsyncIO.Filesystem.Detail.pas',
   AsyncIO.Filesystem in '..\Source\AsyncIO.Filesystem.pas',
   AsyncIO.Net.IP.Detail in '..\Source\AsyncIO.Net.IP.Detail.pas',
@@ -42,7 +42,8 @@ uses
   Test.AsyncIO.Net.IP in 'Test.AsyncIO.Net.IP.pas',
   Test.AsyncIO.Net.IP.Detail.TCPImpl in 'Test.AsyncIO.Net.IP.Detail.TCPImpl.pas',
   Test.AsyncIO.Net.IP.Detail in 'Test.AsyncIO.Net.IP.Detail.pas',
-  EchoTestClient in 'EchoTestClient.pas';
+  EchoTestClient in 'EchoTestClient.pas',
+  AsyncIOTestCase in 'AsyncIOTestCase.pas';
 
 {$R *.RES}
 

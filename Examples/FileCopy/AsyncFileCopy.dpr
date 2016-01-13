@@ -10,7 +10,7 @@ uses
   System.Math,
   AsyncIO.Detail.StreamBufferImpl in '..\..\Source\AsyncIO.Detail.StreamBufferImpl.pas',
   AsyncIO.Detail in '..\..\Source\AsyncIO.Detail.pas',
-  AsyncIO.ErrorCodes in '..\..\Source\AsyncIO.ErrorCodes.pas',
+  AsyncIO.OpResults in '..\..\Source\AsyncIO.OpResults.pas',
   AsyncIO.Filesystem.Detail in '..\..\Source\AsyncIO.Filesystem.Detail.pas',
   AsyncIO.Filesystem in '..\..\Source\AsyncIO.Filesystem.pas',
   AsyncIO in '..\..\Source\AsyncIO.pas',

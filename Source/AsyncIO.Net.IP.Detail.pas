@@ -3,7 +3,7 @@ unit AsyncIO.Net.IP.Detail;
 interface
 
 uses
-  IdWinsock2, AsyncIO, AsyncIO.ErrorCodes, AsyncIO.Detail, AsyncIO.Net.IP;
+  IdWinsock2, AsyncIO, AsyncIO.Detail, AsyncIO.OpResults, AsyncIO.Net.IP;
 
 const
 //#define SO_UPDATE_CONNECT_CONTEXT   0x7010
@@ -33,7 +33,7 @@ type
     property Socket: IPStreamSocket read FSocket;
   end;
 
-function DefaultConnectCondition(const ErrorCode: IOErrorCode; const Endpoint: IPEndpoint): boolean;
+function DefaultConnectCondition(const Res: OpResult; const Endpoint: IPEndpoint): boolean;
 
 implementation
 
@@ -45,7 +45,7 @@ begin
   socketAccess.Assign(Protocol, SocketHandle);
 end;
 
-function DefaultConnectCondition(const ErrorCode: IOErrorCode; const Endpoint: IPEndpoint): boolean;
+function DefaultConnectCondition(const Res: OpResult; const Endpoint: IPEndpoint): boolean;
 begin
   result := True;
 end;

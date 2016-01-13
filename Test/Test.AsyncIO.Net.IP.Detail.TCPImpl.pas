@@ -66,7 +66,7 @@ type
 implementation
 
 uses
-  System.SysUtils, AsyncIO.ErrorCodes, System.Threading, IdStack;
+  System.SysUtils, AsyncIO.OpResults, System.Threading, IdStack;
 
 procedure TestTTCPSocketImpl.SetUp;
 begin
@@ -171,10 +171,10 @@ begin
 
   HandlerExecuted := False;
   Handler :=
-    procedure(const ErrorCode: IOErrorCode)
+    procedure(const Res: OpResult)
     begin
       HandlerExecuted := True;
-      CheckEquals(IOErrorCode.Success, ErrorCode, 'AsyncConnect failed');
+      CheckEquals(SystemResults.Success, Res, 'AsyncConnect failed');
       CheckEquals(PeerEndpoint, FTCPSocketImpl.RemoteEndpoint, 'Wrong remote endpoint');
     end;
 
@@ -265,7 +265,7 @@ begin
 
   HandlerExecuted := False;
   Handler :=
-    procedure(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64)
+    procedure(const Res: OpResult; const BytesTransferred: UInt64)
     begin
       HandlerExecuted := True;
     end;
@@ -285,7 +285,7 @@ begin
 
   HandlerExecuted := False;
   Handler :=
-    procedure(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64)
+    procedure(const Res: OpResult; const BytesTransferred: UInt64)
     begin
       HandlerExecuted := True;
     end;
@@ -320,10 +320,10 @@ begin
 
   HandlerExecuted := False;
   Handler :=
-    procedure(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64)
+    procedure(const Res: OpResult; const BytesTransferred: UInt64)
     begin
       HandlerExecuted := True;
-      CheckEquals(IOErrorCode.Success, ErrorCode, 'Failed to write data');
+      CheckEquals(SystemResults.Success, Res, 'Failed to write data');
       CheckEquals(Length(Data), BytesTransferred, 'Failed to write all data');
     end;
 
@@ -353,10 +353,10 @@ begin
 
   HandlerExecuted := False;
   Handler :=
-    procedure(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64)
+    procedure(const Res: OpResult; const BytesTransferred: UInt64)
     begin
       HandlerExecuted := True;
-      CheckEquals(IOErrorCode.Success, ErrorCode, 'Failed to write data');
+      CheckEquals(SystemResults.Success, Res, 'Failed to write data');
       CheckEquals(Length(SrcData), BytesTransferred, 'Failed to write all data');
     end;
 
@@ -371,10 +371,10 @@ begin
   // now do actual receive test
   HandlerExecuted := False;
   Handler :=
-    procedure(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64)
+    procedure(const Res: OpResult; const BytesTransferred: UInt64)
     begin
       HandlerExecuted := True;
-      CheckEquals(IOErrorCode.Success, ErrorCode, 'Failed to read data');
+      CheckEquals(SystemResults.Success, Res, 'Failed to read data');
       CheckEquals(Length(RecvData), BytesTransferred, 'Failed to read all data');
     end;
 
@@ -418,10 +418,10 @@ begin
 
   HandlerExecuted := False;
   Handler :=
-    procedure(const ErrorCode: IOErrorCode)
+    procedure(const Res: OpResult)
     begin
       HandlerExecuted := True;
-      CheckEquals(IOErrorCode.Success, ErrorCode, 'Failed to accept connection');
+      CheckEquals(SystemResults.Success, Res, 'Failed to accept connection');
       PeerSocket.Close;
     end;
 

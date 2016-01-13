@@ -3,7 +3,7 @@ unit AsyncIO.Detail;
 interface
 
 uses
-  WinAPI.Windows, System.SysUtils, System.Classes, AsyncIO, AsyncIO.ErrorCodes;
+  WinAPI.Windows, System.SysUtils, System.Classes, AsyncIO, AsyncIO.OpResults;
 
 type
   IOCPContext  = class
@@ -19,7 +19,7 @@ type
     property Overlapped: POverlapped read GetOverlapped;
     property OverlappedOffset: UInt64 read GetOverlappedOffset write SetOverlappedOffset;
 
-    procedure ExecHandler(const ec: IOErrorCode; const transferred: Int64); virtual;
+    procedure ExecHandler(const res: OpResult; const transferred: Int64); virtual;
 
     class function FromOverlapped(const Overlapped: POverlapped): IOCPContext;
   end;
@@ -30,7 +30,7 @@ type
   public
     constructor Create(const Handler: CompletionHandler);
 
-    procedure ExecHandler(const ec: IOErrorCode; const transferred: Int64); override;
+    procedure ExecHandler(const res: OpResult; const transferred: Int64); override;
 
     property Handler: CompletionHandler read FHandler;
   end;
@@ -41,7 +41,7 @@ type
   public
     constructor Create(const Handler: OpHandler);
 
-    procedure ExecHandler(const ec: IOErrorCode; const transferred: Int64); override;
+    procedure ExecHandler(const res: OpResult; const transferred: Int64); override;
 
     property Handler: OpHandler read FHandler;
   end;
@@ -52,7 +52,7 @@ type
   public
     constructor Create(const Handler: IOHandler);
 
-    procedure ExecHandler(const ec: IOErrorCode; const transferred: Int64); override;
+    procedure ExecHandler(const res: OpResult; const transferred: Int64); override;
 
     property Handler: IOHandler read FHandler;
   end;
@@ -196,7 +196,7 @@ begin
   inherited;
 end;
 
-procedure IOCPContext.ExecHandler(const ec: IOErrorCode; const transferred: Int64);
+procedure IOCPContext.ExecHandler(const res: OpResult; const transferred: Int64);
 begin
   raise ENotImplemented.Create('Invalid context handler');
 end;
@@ -233,7 +233,7 @@ begin
   FHandler := Handler;
 end;
 
-procedure HandlerContext.ExecHandler(const ec: IOErrorCode; const transferred: Int64);
+procedure HandlerContext.ExecHandler(const res: OpResult; const transferred: Int64);
 begin
   Handler();
 end;
@@ -247,10 +247,9 @@ begin
   FHandler := Handler;
 end;
 
-procedure OpHandlerContext.ExecHandler(const ec: IOErrorCode;
-  const transferred: Int64);
+procedure OpHandlerContext.ExecHandler(const res: OpResult; const transferred: Int64);
 begin
-  Handler(ec);
+  Handler(res);
 end;
 
 { IOHandlerContext }
@@ -262,9 +261,9 @@ begin
   FHandler := Handler;
 end;
 
-procedure IOHandlerContext.ExecHandler(const ec: IOErrorCode; const transferred: Int64);
+procedure IOHandlerContext.ExecHandler(const res: OpResult; const transferred: Int64);
 begin
-  Handler(ec, transferred);
+  Handler(res, transferred);
 end;
 
 { IOServiceImpl }
@@ -324,40 +323,40 @@ end;
 
 function IOServiceImpl.DoPollOne(const Timeout: DWORD): integer;
 var
-  res: boolean;
+  success: boolean;
   overlapped: POverlapped;
   completionKey: ULONG_PTR;
   transferred: DWORD;
-  ec: IOErrorCode;
+  res: OpResult;
   ctx: IOCPContext;
 begin
   result := 0;
 
   ctx := nil;
   overlapped := nil;
-  res := GetQueuedCompletionStatus(IOCP, transferred, completionKey, overlapped, Timeout);
+  success := GetQueuedCompletionStatus(IOCP, transferred, completionKey, overlapped, Timeout);
 
 //  WriteLn('DEBUG completion key: ', completionKey);
 //  WriteLn(Format('DEBUG completion overlapped: %.8x', [NativeUInt(overlapped)]));
 
-  if res then
+  if success then
   begin
-    ec := IOErrorCode.Success;
+    res := SystemResults.Success;
   end
   else
   begin
-    ec := IOErrorCode.FromLastError();
+    res := SystemResults.LastError;
     if Assigned(overlapped) then
     begin
       // failed IO operation, trigger handler
     end
-    else if ec.Value = WAIT_TIMEOUT then
+    else if (res = SystemResults.WaitTimeout) then
     begin
       // nothing to do
       exit;
     end
     else
-      RaiseLastOSError;
+      res.RaiseException();
   end;
 
   if completionKey = COMPLETION_KEY_EXIT then
@@ -371,7 +370,7 @@ begin
   try
     result := 1;
     if not Stopped then
-      ctx.ExecHandler(ec, transferred);
+      ctx.ExecHandler(res, transferred);
   finally
     ctx.Free;
   end;
@@ -574,10 +573,10 @@ var
   ec: DWORD;
 begin
   ctx := IOHandlerContext.Create(
-    procedure(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64)
+    procedure(const Res: OpResult; const BytesTransferred: UInt64)
     begin
       FOffset := FOffset + BytesTransferred;
-      Handler(ErrorCode, BytesTransferred);
+      Handler(Res, BytesTransferred);
     end
   );
   // offset is ignored if handle does not support it
@@ -607,10 +606,10 @@ var
   ec: DWORD;
 begin
   ctx := IOHandlerContext.Create(
-    procedure(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64)
+    procedure(const Res: OpResult; const BytesTransferred: UInt64)
     begin
       FOffset := FOffset + BytesTransferred;
-      Handler(ErrorCode, BytesTransferred);
+      Handler(Res, BytesTransferred);
     end
   );
   // offset is ignored if handle does not support it

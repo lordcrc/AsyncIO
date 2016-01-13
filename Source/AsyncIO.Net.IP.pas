@@ -3,7 +3,7 @@ unit AsyncIO.Net.IP;
 interface
 
 uses
-  IdWinsock2, AsyncIO, AsyncIO.ErrorCodes;
+  System.SysUtils, IdWinsock2, AsyncIO, AsyncIO.OpResults;
 
 type
   IPv4Address = record
@@ -303,13 +303,13 @@ type
   );
 
   IPSocket = interface
-{$REGION 'Property accessors'}
+    {$REGION 'Property accessors'}
     function GetService: IOService;
     function GetProtocol: IPProtocol;
     function GetLocalEndpoint: IPEndpoint;
     function GetRemoteEndpoint: IPEndpoint;
     function GetSocketHandle: TSocket;
-{$ENDREGION}
+    {$ENDREGION}
 
     procedure AsyncConnect(const PeerEndpoint: IPEndpoint; const Handler: OpHandler);
 
@@ -336,12 +336,12 @@ function NewTCPSocket(const Service: IOService): IPStreamSocket;
 
 type
   IPAcceptor = interface
-{$REGION 'Property accessors'}
+    {$REGION 'Property accessors'}
     function GetService: IOService;
     function GetProtocol: IPProtocol;
     function GetLocalEndpoint: IPEndpoint;
     function GetIsOpen: boolean;
-{$ENDREGION}
+    {$ENDREGION}
 
     procedure AsyncAccept(const Peer: IPSocket; const Handler: OpHandler);
 
@@ -368,6 +368,7 @@ function NewTCPAcceptor(const Service: IOService; const LocalEndpoint: IPEndpoin
 
 type
   AsyncSocketStream = interface(AsyncStream)
+    ['{4AC5054A-A502-4A3E-A46E-E3852CC1DEE1}']
     {$REGION 'Property accessors'}
     function GetSocket: IPStreamSocket;
     {$ENDREGION}
@@ -380,28 +381,66 @@ function NewAsyncSocketStream(const Socket: IPStreamSocket): AsyncSocketStream;
 type
   // ErrorCode - error code from last attempt
   // Endpoint - the endpoint of the connection if successful, otherwise unspecified endpoint
-  ConnectHandler = reference to procedure(const ErrorCode: IOErrorCode; const Endpoint: IPEndpoint);
+  ConnectHandler = reference to procedure(const Res: OpResult; const Endpoint: IPEndpoint);
 
   // Should return true if connection should be attempted to the endpoint
   // ErrorCode - error code from last attempt, initialized to Success
   // Endpoint - the endpoint to be used for the next connection attempt
-  ConnectCondition = reference to function(const ErrorCode: IOErrorCode; const Endpoint: IPEndpoint): boolean;
+  ConnectCondition = reference to function(const Res: OpResult; const Endpoint: IPEndpoint): boolean;
 
 procedure AsyncConnect(const Socket: IPSocket; const Endpoints: IPResolver.Results; const Handler: ConnectHandler); overload;
 procedure AsyncConnect(const Socket: IPSocket; const Endpoints: TArray<IPEndpoint>; const Handler: ConnectHandler); overload;
 procedure AsyncConnect(const Socket: IPSocket; const Endpoints: IPResolver.Results; const Condition: ConnectCondition; const Handler: ConnectHandler); overload;
 procedure AsyncConnect(const Socket: IPSocket; const Endpoints: TArray<IPEndpoint>; const Condition: ConnectCondition; const Handler: ConnectHandler); overload;
 
+type
+  ENetException = class(Exception);
+
+  NetIPCategory = class(OpResultCategory)
+  public
+    class function IsSuccess(const ResultValue: integer): boolean; override;
+    class function Message(const ResultValue: integer): string; override;
+    class function Equivalent(const ResultValue: integer; const OtherResult: OpResult): boolean; override;
+    class procedure RaiseException(const ResultValue: integer; const AdditionalInfo: string); override;
+  end;
+
+  NetResults = record
+    class function Success: OpResult; static;
+    class function OperationAborted: OpResult; static;
+    class function NoBuffersAvailable: OpResult; static;
+    class function AccessDenied: OpResult; static;
+    class function AddressInUse: OpResult; static;
+    class function NetworkDown: OpResult; static;
+    class function NetworkReset: OpResult; static;
+    class function IsConnected: OpResult; static;
+    class function NotConnected: OpResult; static;
+    class function ConnectionTimedOut: OpResult; static;
+    class function ConnectionRefused: OpResult; static;
+    class function ConnectionAborted: OpResult; static;
+    class function ConnectionReset: OpResult; static;
+    class function HostDown: OpResult; static;
+    class function HostUnreachable: OpResult; static;
+    class function HostNotFound: OpResult; static;
+    class function ShutdownInProgress: OpResult; static;
+  end;
+
+function NetResult(const ResultValue: integer): OpResult;
+
 implementation
 
 uses
   System.RegularExpressions, IdWship6,
-  System.SysUtils, System.Math, Winapi.Windows, AsyncIO.Detail,
+  System.Math, Winapi.Windows, AsyncIO.Detail,
   AsyncIO.Net.IP.Detail, AsyncIO.Net.IP.Detail.TCPImpl;
 
 function NewAsyncSocketStream(const Socket: IPStreamSocket): AsyncSocketStream;
 begin
   result := AsyncSocketStreamImpl.Create(Socket);
+end;
+
+function NetResult(const ResultValue: integer): OpResult;
+begin
+  result := OpResult.Create(ResultValue, NetIPCategory);
 end;
 
 { IPv4Address }
@@ -534,7 +573,7 @@ end;
 
 function IPv6Address.GetData: IPv6AddressBytes;
 begin
-  Move(FAddress[0], result[0], SizeOf(IPv6AddressBytes));
+  Move(FAddress, result, SizeOf(IPv6AddressBytes));
 end;
 
 function IPv6Address.GetIsLoopback: boolean;
@@ -823,8 +862,11 @@ begin
 end;
 
 class function IPProtocol.ICMP: ICMPProtocol;
+var
+  t: ICMPProtocol;
 begin
   // just a helper
+  result := t;
 end;
 
 class operator IPProtocol.NotEqual(const Protocol1, Protocol2: IPProtocol): boolean;
@@ -832,8 +874,8 @@ begin
   result := not (Protocol1 = Protocol2);
 end;
 
-class function IPProtocol.TCP: TCPProtocol;
-begin
+class function IPProtocol.TCP: TCPProtocol; // FI:W521
+begin // FI:W519
   // just a helper
 end;
 
@@ -850,8 +892,8 @@ begin
   result := result + '/' + Family.ToString;
 end;
 
-class function IPProtocol.UDP: UDPProtocol;
-begin
+class function IPProtocol.UDP: UDPProtocol; // FI:W521
+begin // FI:W519
   // just a helper
 end;
 
@@ -1402,16 +1444,16 @@ begin
   idx := -1;
 
   connectOp :=
-    procedure(const ErrorCode: IOErrorCode)
+    procedure(const Res: OpResult)
     var
       start: boolean;
       useEndpoint: boolean;
     begin
       start := (idx < 0);
 
-      if (not start) and (ErrorCode = ErrorCode.Success) then
+      if (not start) and (Res.Success) then
       begin
-        Handler(ErrorCode, Endpoints[idx]);
+        Handler(Res, Endpoints[idx]);
         connectOp := nil; // release handler
         exit;
       end;
@@ -1421,12 +1463,12 @@ begin
         idx := idx + 1;
         if (idx >= Length(Endpoints)) then
         begin
-          Handler(ErrorCode, Endpoint());
+          Handler(Res, Endpoint());
           connectOp := nil; // release handler
           exit;
         end;
 
-        useEndpoint := Condition(ErrorCode, Endpoints[idx]);
+        useEndpoint := Condition(Res, Endpoints[idx]);
 
         if (useEndpoint) then
           break;
@@ -1436,7 +1478,130 @@ begin
       Socket.AsyncConnect(Endpoints[idx], connectOp);
     end;
 
-  connectOp(IOErrorCode.Success);
+  connectOp(SystemResults.Success);
+end;
+
+{ NetResults }
+
+class function NetResults.AccessDenied: OpResult;
+begin
+  result := NetResult(WSAEACCES);
+end;
+
+class function NetResults.AddressInUse: OpResult;
+begin
+  result := NetResult(WSAEADDRINUSE);
+end;
+
+class function NetResults.ConnectionAborted: OpResult;
+begin
+  result := NetResult(WSAECONNABORTED);
+end;
+
+class function NetResults.ConnectionRefused: OpResult;
+begin
+  result := NetResult(WSAECONNREFUSED);
+end;
+
+class function NetResults.ConnectionReset: OpResult;
+begin
+  result := NetResult(WSAECONNRESET);
+end;
+
+class function NetResults.ConnectionTimedOut: OpResult;
+begin
+  result := NetResult(WSAETIMEDOUT);
+end;
+
+class function NetResults.HostDown: OpResult;
+begin
+  result := NetResult(WSAEHOSTDOWN);
+end;
+
+class function NetResults.HostNotFound: OpResult;
+begin
+  result := NetResult(WSAHOST_NOT_FOUND);
+end;
+
+class function NetResults.HostUnreachable: OpResult;
+begin
+  result := NetResult(WSAEHOSTUNREACH);
+end;
+
+class function NetResults.IsConnected: OpResult;
+begin
+  result := NetResult(WSAEISCONN);
+end;
+
+class function NetResults.NetworkDown: OpResult;
+begin
+  result := NetResult(WSAENETDOWN);
+end;
+
+class function NetResults.NetworkReset: OpResult;
+begin
+  result := NetResult(WSAENETRESET);
+end;
+
+class function NetResults.NoBuffersAvailable: OpResult;
+begin
+  result := NetResult(WSAENOBUFS);
+end;
+
+class function NetResults.NotConnected: OpResult;
+begin
+  result := NetResult(WSAENOTCONN);
+end;
+
+class function NetResults.OperationAborted: OpResult;
+begin
+  result := NetResult(WSA_OPERATION_ABORTED);
+end;
+
+class function NetResults.ShutdownInProgress: OpResult;
+begin
+  result := NetResult(WSAESHUTDOWN);
+end;
+
+class function NetResults.Success: OpResult;
+begin
+  result := NetResult(ERROR_SUCCESS);
+end;
+
+{ NetIPCategory }
+
+class function NetIPCategory.Equivalent(const ResultValue: integer;
+  const OtherResult: OpResult): boolean;
+begin
+  result := False;
+
+  if (OtherResult.Category = GenericCategory) then
+  begin
+    case ResultValue of
+      ERROR_SUCCESS: result := (OtherResult = GenericResults.Success);
+    end;
+  end
+  else if (OtherResult.Category = SystemCategory) then
+  begin
+    case ResultValue of
+      ERROR_SUCCESS: result := (OtherResult = SystemResults.Success);
+    end;
+  end;
+end;
+
+class function NetIPCategory.IsSuccess(const ResultValue: integer): boolean;
+begin
+  result := (ResultValue = ERROR_SUCCESS);
+end;
+
+class function NetIPCategory.Message(const ResultValue: integer): string;
+begin
+  result := SysErrorMessage(DWORD(ResultValue));
+end;
+
+class procedure NetIPCategory.RaiseException(const ResultValue: integer; const AdditionalInfo: string);
+begin
+  raise ENetException.Create(Message(ResultValue) + AdditionalInfo);
 end;
 
 initialization

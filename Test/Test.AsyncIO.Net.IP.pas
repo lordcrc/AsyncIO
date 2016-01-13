@@ -103,7 +103,7 @@ type
 implementation
 
 uses
-  System.SysUtils, AsyncIO.ErrorCodes;
+  System.SysUtils, AsyncIO.OpResults;
 
 
 procedure TestIPv4Address.SetUp;
@@ -488,11 +488,11 @@ begin
   EndpointIndex := 0;
 
   Condition :=
-    function(const ErrorCode: IOErrorCode; const Endpoint: IPEndpoint): boolean
+    function(const Res: OpResult; const Endpoint: IPEndpoint): boolean
     begin
       ConditionExecuted := True;
 
-      CheckFalse(ErrorCode, 'Connect result: ' + ErrorCode.Message);
+      CheckTrue(Res.Success, 'Connect result: ' + Res.Message);
       CheckTrue(EndpointIndex < Length(Endpoints), 'Connect condition index 1');
       CheckEquals(Endpoints[EndpointIndex], Endpoint, 'Connect condition');
 
@@ -503,11 +503,11 @@ begin
     end;
 
   Handler :=
-    procedure(const ErrorCode: IOErrorCode; const Endpoint: IPEndpoint)
+    procedure(const Res: OpResult; const Endpoint: IPEndpoint)
     begin
       HandlerExecuted := True;
 
-      CheckFalse(ErrorCode, 'Connect result: ' + ErrorCode.Message);
+      CheckTrue(Res.Success, 'Connect result: ' + Res.Message);
       CheckEquals(Length(Endpoints), EndpointIndex, 'Connect condition index 2');
       CheckEquals(Endpoints[EndpointIndex-1], Endpoint, 'Connected endpoint');
     end;
@@ -533,11 +533,11 @@ begin
   HandlerExecuted := False;
 
   Handler :=
-    procedure(const ErrorCode: IOErrorCode; const Endpoint: IPEndpoint)
+    procedure(const Res: OpResult; const Endpoint: IPEndpoint)
     begin
       HandlerExecuted := True;
 
-      CheckFalse(ErrorCode, 'Connect result: ' + ErrorCode.Message);
+      CheckTrue(Res.Success, 'Connect result: ' + Res.Message);
       CheckEquals(Endpoints[0], Endpoint, 'Connected endpoint');
     end;
 
@@ -562,11 +562,11 @@ begin
   HandlerExecuted := False;
 
   Handler :=
-    procedure(const ErrorCode: IOErrorCode; const Endpoint: IPEndpoint)
+    procedure(const Res: OpResult; const Endpoint: IPEndpoint)
     begin
       HandlerExecuted := True;
 
-      CheckTrue(ErrorCode, 'Connection attempts should fail but didn''t');
+      CheckFalse(Res.Success, 'Connection attempts should fail but didn''t');
     end;
 
   AsyncConnect(FSocket, Endpoints, Handler);
@@ -593,11 +593,11 @@ begin
   HandlerExecuted := False;
 
   Handler :=
-    procedure(const ErrorCode: IOErrorCode; const Endpoint: IPEndpoint)
+    procedure(const Res: OpResult; const Endpoint: IPEndpoint)
     begin
       HandlerExecuted := True;
 
-      CheckFalse(ErrorCode, 'Connect result: ' + ErrorCode.Message);
+      CheckTrue(Res.Success, 'Connect result: ' + Res.Message);
       CheckEquals(Endpoints[0], Endpoint, 'Connected endpoint');
     end;
 

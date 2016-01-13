@@ -90,7 +90,7 @@ type
 implementation
 
 uses
-  Winapi.Windows, System.SysUtils, AsyncIO.ErrorCodes, AsyncIO.Detail;
+  Winapi.Windows, System.SysUtils, AsyncIO.OpResults, AsyncIO.Detail;
 
 { TTCPSocketImpl }
 
@@ -124,24 +124,24 @@ begin
     CreateSocket;
 
   ctx := OpHandlerContext.Create(
-    procedure(const ErrorCode: IOErrorCode)
+    procedure(const Res: OpResult)
     var
       err: DWORD;
-      ec: IOErrorCode;
+      r: OpResult;
     begin
-      ec := ErrorCode;
-      if (not ec) then
+      r := Res;
+      if (r.Success) then
       begin
         // update socket options
         // ConnectEx requires this
         err := IdWinsock2.setsockopt(SocketHandle, SOL_SOCKET, SO_UPDATE_CONNECT_CONTEXT, nil, 0);
         if (err <> 0) then
           // set code from GetLastError
-          ec := IOErrorCode.FromLastError();
+          r := SystemResults.LastError;
       end;
 
       // if connect succeeded but setsockopt failed, pass the error from the latter
-      Handler(ec);
+      Handler(r);
     end
   );
 
@@ -370,12 +370,12 @@ begin
   listenSocket := SocketHandle;
 
   ctx := OpHandlerContext.Create(
-    procedure(const ErrorCode: IOErrorCode)
+    procedure(const Res: OpResult)
     var
       err: DWORD;
-      ec: IOErrorCode;
+      r: OpResult;
     begin
-      ec := ErrorCode;
+      r := Res;
 
       // ensure we capture addrBuffer
       // TODO - extract peer endpoint
@@ -384,18 +384,18 @@ begin
       // assign the peer socket handle
       IPSocketAssign(Peer, peerProtocol, peerSocket);
 
-      if (not ec) then
+      if (not r.Success) then
       begin
         // update socket options, need to associate the listen socket with the accept socket
         // AcceptEx requires this for getsockname/getpeername
         err := IdWinsock2.setsockopt(Peer.SocketHandle, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, @listenSocket, SizeOf(listenSocket));
         if (err <> 0) then
           // set code from GetLastError
-          ec := IOErrorCode.FromLastError();
+          r := SystemResults.LastError;
       end;
 
       // if connect succeeded but setsockopt failed, pass the error from the latter
-      Handler(ec);
+      Handler(r);
     end
   );
 

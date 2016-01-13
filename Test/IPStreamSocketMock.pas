@@ -37,7 +37,7 @@ type
 implementation
 
 uses
-  System.SysUtils, AsyncIO.ErrorCodes;
+  System.SysUtils, AsyncIO.OpResults;
 
 { TIPStreamSocketMock }
 
@@ -51,13 +51,13 @@ begin
     begin
       if (FConnected) then
       begin
-        Handler(IOErrorCode.Create(WSAEISCONN))
+        Handler(NetResults.IsConnected)
       end
       else
       begin
         FPeerEndpoint := peer;
         FConnected := True;
-        Handler(IOErrorCode.Success);
+        Handler(NetResults.Success);
       end;
     end
   );
@@ -72,9 +72,9 @@ begin
     procedure
     begin
       if (FConnected) then
-        Handler(IOErrorCode.Success, bufferSize)
+        Handler(NetResults.Success, bufferSize)
       else
-        Handler(IOErrorCode.Create(WSAENOTCONN), 0);
+        Handler(NetResults.NotConnected, 0);
     end
   );
 end;
@@ -88,9 +88,9 @@ begin
     procedure
     begin
       if (FConnected) then
-        Handler(IOErrorCode.Success, bufferSize)
+        Handler(NetResults.Success, bufferSize)
       else
-        Handler(IOErrorCode.Create(WSAENOTCONN), 0);
+        Handler(NetResults.NotConnected, 0);
     end
   );
 end;
@@ -108,7 +108,7 @@ end;
 procedure TIPStreamSocketMock.Connect(const PeerEndpoint: IPEndpoint);
 begin
   if (FConnected) then
-    RaiseLastOSError(WSAEISCONN);
+    NetResults.IsConnected.RaiseException;
 
   FPeerEndpoint := PeerEndpoint;
   FConnected := True;

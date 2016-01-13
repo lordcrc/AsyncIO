@@ -14,7 +14,7 @@ uses
   RegularExpr in '..\..\..\RegularExpr\RegularExpr.pas',
   AsyncIO.Detail in '..\..\Source\AsyncIO.Detail.pas',
   AsyncIO.Detail.StreamBufferImpl in '..\..\Source\AsyncIO.Detail.StreamBufferImpl.pas',
-  AsyncIO.ErrorCodes in '..\..\Source\AsyncIO.ErrorCodes.pas',
+  AsyncIO.OpResults in '..\..\Source\AsyncIO.OpResults.pas',
   AsyncIO.Net.IP.Detail in '..\..\Source\AsyncIO.Net.IP.Detail.pas',
   AsyncIO.Net.IP.Detail.TCPImpl in '..\..\Source\AsyncIO.Net.IP.Detail.TCPImpl.pas',
   AsyncIO.Net.IP in '..\..\Source\AsyncIO.Net.IP.pas',

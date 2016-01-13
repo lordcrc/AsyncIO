@@ -3,14 +3,13 @@ unit NetTestCase;
 interface
 
 uses
-  System.SysUtils, TestFramework, AsyncIO.Net.IP, AsyncIO.ErrorCodes;
+  System.SysUtils, TestFramework, AsyncIOTestCase, AsyncIO.Net.IP;
 
 type
-  TNetTestCase = class(TTestCase)
+  TNetTestCase = class(TAsyncIOTestCase)
   protected
     function GenerateData(const Length: integer): TBytes;
   public
-    procedure CheckEquals(expected, actual: IOErrorCode; msg: string = ''); overload; virtual;
     procedure CheckEquals(expected, actual: IPv4Address; msg: string = ''); overload; virtual;
     procedure CheckEquals(expected, actual: IPv6Address; msg: string = ''); overload; virtual;
     procedure CheckEquals(expected, actual: IPAddress; msg: string = ''); overload; virtual;
@@ -34,13 +33,6 @@ begin
   begin
     result[i] := Random(256);
   end;
-end;
-
-procedure TNetTestCase.CheckEquals(expected, actual: IOErrorCode; msg: string);
-begin
-  FCheckCalled := True;
-  if (expected <> actual) then
-    FailNotEquals(expected.Message, actual.Message, msg);
 end;
 
 procedure TNetTestCase.CheckEquals(expected, actual: IPv4Address; msg: string);

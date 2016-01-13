@@ -12,13 +12,13 @@ unit Test.AsyncIO.Detail;
 interface
 
 uses
-  TestFramework, System.Classes, WinAPI.Windows, AsyncIO.Detail, AsyncIO,
-  AsyncIO.ErrorCodes;
+  TestFramework, AsyncIOTestCase, System.Classes, WinAPI.Windows, AsyncIO.Detail, AsyncIO,
+  AsyncIO.OpResults;
 
 type
   // Test methods for class IOCPContext
 
-  TestIOCPContext = class(TTestCase)
+  TestIOCPContext = class(TAsyncIOTestCase)
   strict private
     FIOCPContext: IOCPContext;
   public
@@ -30,7 +30,7 @@ type
   end;
   // Test methods for class HandlerContext
 
-  TestHandlerContext = class(TTestCase)
+  TestHandlerContext = class(TAsyncIOTestCase)
   strict private
     FHandlerContext: HandlerContext;
     FHandlerExecuted: boolean;
@@ -42,7 +42,7 @@ type
   end;
   // Test methods for class OpHandlerContext
 
-  TestOpHandlerContext = class(TTestCase)
+  TestOpHandlerContext = class(TAsyncIOTestCase)
   strict private
     FOpHandlerContext: OpHandlerContext;
     FHandlerExecuted: boolean;
@@ -54,7 +54,7 @@ type
   end;
   // Test methods for class IOHandlerContext
 
-  TestIOHandlerContext = class(TTestCase)
+  TestIOHandlerContext = class(TAsyncIOTestCase)
   strict private
     FIOHandlerContext: IOHandlerContext;
     FHandlerExecuted: boolean;
@@ -66,7 +66,7 @@ type
   end;
   // Test methods for class IOServiceImpl
 
-  TestIOServiceImpl = class(TTestCase)
+  TestIOServiceImpl = class(TAsyncIOTestCase)
   strict private
     FIOService: IOService;
     FHandler1Executed: boolean;
@@ -86,7 +86,7 @@ type
   end;
   // Test methods for class AsyncStreamImplBase
 
-  TestAsyncStreamImplBase = class(TTestCase)
+  TestAsyncStreamImplBase = class(TAsyncIOTestCase)
   strict private
     FIOService: IOService;
     FAsyncStream: AsyncStream;
@@ -100,7 +100,7 @@ type
   end;
   // Test methods for class AsyncHandleStreamImpl
 
-  TestAsyncHandleStreamImpl = class(TTestCase)
+  TestAsyncHandleStreamImpl = class(TAsyncIOTestCase)
   strict private
     FHandle: THandle;
     FIOService: IOService;
@@ -133,14 +133,14 @@ end;
 procedure TestIOCPContext.TestExecHandler;
 var
   transferred: Int64;
-  ec: IOErrorCode;
+  res: OpResult;
 begin
   transferred := 0;
-  ec := IOErrorCode.Success;
+  res := GenericResults.Success;
 
   StartExpectingException(ENotImplemented);
 
-  FIOCPContext.ExecHandler(ec, transferred);
+  FIOCPContext.ExecHandler(res, transferred);
 
   StopExpectingException();
 end;
@@ -180,12 +180,12 @@ end;
 procedure TestHandlerContext.TestExecHandler;
 var
   transferred: Int64;
-  ec: IOErrorCode;
+  res: OpResult;
 begin
   transferred := 0;
-  ec := IOErrorCode.Success;
+  res := GenericResults.Success;
 
-  FHandlerContext.ExecHandler(ec, transferred);
+  FHandlerContext.ExecHandler(res, transferred);
 
   CheckTrue(FHandlerExecuted, 'HandlerContext failed to execute handler');
 end;
@@ -195,9 +195,9 @@ var
   Handler: OpHandler;
 begin
   Handler :=
-    procedure(const ErrorCode: IOErrorCode)
+    procedure(const Res: OpResult)
     begin
-      CheckTrue(ErrorCode = IOErrorCode.EndOfFile, 'OpHandler failed to pass ErrorCode parameter correctly');
+      CheckTrue(Res = SystemResults.EndOfFile, 'OpHandler failed to pass ErrorCode parameter correctly');
       FHandlerExecuted := True;
     end;
 
@@ -214,12 +214,12 @@ end;
 procedure TestOpHandlerContext.TestExecHandler;
 var
   transferred: Int64;
-  ec: IOErrorCode;
+  res: OpResult;
 begin
   transferred := 0;
-  ec := IOErrorCode.EndOfFile;
+  res := SystemResults.EndOfFile;
 
-  FOpHandlerContext.ExecHandler(ec, transferred);
+  FOpHandlerContext.ExecHandler(res, transferred);
 
   CheckTrue(FHandlerExecuted, 'OpHandlerContext failed to execute handler');
 end;
@@ -229,9 +229,9 @@ var
   Handler: IOHandler;
 begin
   Handler :=
-    procedure(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64)
+    procedure(const Res: OpResult; const BytesTransferred: UInt64)
     begin
-      CheckTrue(ErrorCode = IOErrorCode.EndOfFile, 'IOHandler failed to pass ErrorCode parameter correctly');
+      CheckTrue(Res = SystemResults.EndOfFile, 'IOHandler failed to pass ErrorCode parameter correctly');
       CheckEquals(42, BytesTransferred, 'IOHandler failed to pass BytesTransferred parameter correctly');
       FHandlerExecuted := True;
     end;
@@ -249,12 +249,12 @@ end;
 procedure TestIOHandlerContext.TestExecHandler;
 var
   transferred: Int64;
-  ec: IOErrorCode;
+  res: OpResult;
 begin
   transferred := 42;
-  ec := IOErrorCode.EndOfFile;
+  res := SystemResults.EndOfFile;
 
-  FIOHandlerContext.ExecHandler(ec, transferred);
+  FIOHandlerContext.ExecHandler(res, transferred);
 
   CheckTrue(FHandlerExecuted, 'IOHandlerContext failed to execute handler');
 end;
@@ -305,20 +305,20 @@ var
   ReturnValue: Int64;
 begin
   Handler1 :=
-    procedure(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64)
+    procedure(const Res: OpResult; const BytesTransferred: UInt64)
     begin
       CheckFalse(FHandler1Executed, 'Completion handler 1 executed multiple times');
       FHandler1Executed := True;
-      CheckEquals(IOErrorCode.Success.Value, ErrorCode.Value, 'Completion handler 1 received an error');
+      CheckEquals(GenericResults.Success, Res, 'Completion handler 1 received an error');
       CheckEquals(42, BytesTransferred, 'Completion handler 1 received incorrect BytesTransferred value');
     end;
 
   Handler2 :=
-    procedure(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64)
+    procedure(const Res: OpResult; const BytesTransferred: UInt64)
     begin
       CheckFalse(FHandler2Executed, 'Completion handler 2 executed multiple times');
       FHandler2Executed := True;
-      CheckEquals(IOErrorCode.Success.Value, ErrorCode.Value, 'Completion handler 2 received an error');
+      CheckEquals(GenericResults.Success, Res, 'Completion handler 2 received an error');
       CheckEquals(123, BytesTransferred, 'Completion handler 2 received incorrect BytesTransferred value');
     end;
 
@@ -346,20 +346,20 @@ var
   ReturnValue: Int64;
 begin
   Handler1 :=
-    procedure(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64)
+    procedure(const Res: OpResult; const BytesTransferred: UInt64)
     begin
       CheckFalse(FHandler1Executed, 'Completion handler 1 executed multiple times');
       FHandler1Executed := True;
-      CheckEquals(IOErrorCode.Success.Value, ErrorCode.Value, 'Completion handler 1 received an error');
+      CheckEquals(GenericResults.Success, Res, 'Completion handler 1 received an error');
       CheckEquals(42, BytesTransferred, 'Completion handler 1 received incorrect BytesTransferred value');
     end;
 
   Handler2 :=
-    procedure(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64)
+    procedure(const Res: OpResult; const BytesTransferred: UInt64)
     begin
       CheckFalse(FHandler2Executed, 'Completion handler 2 executed multiple times');
       FHandler2Executed := True;
-      CheckEquals(IOErrorCode.Success.Value, ErrorCode.Value, 'Completion handler 2 received an error');
+      CheckEquals(GenericResults.Success, Res, 'Completion handler 2 received an error');
       CheckEquals(123, BytesTransferred, 'Completion handler 2 received incorrect BytesTransferred value');
     end;
 

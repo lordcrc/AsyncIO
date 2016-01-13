@@ -35,7 +35,7 @@ type
 implementation
 
 uses
-  IPStreamSocketMock, AsyncIO.ErrorCodes;
+  IPStreamSocketMock, AsyncIO.OpResults;
 
 procedure TestAsyncSocketStreamImpl.SetUp;
 begin
@@ -76,10 +76,10 @@ begin
   Buffer := data;
 
   Handler :=
-    procedure(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64)
+    procedure(const Res: OpResult; const BytesTransferred: UInt64)
     begin
       FHandlerExecuted := True;
-      CheckFalse(ErrorCode, 'Error: ' + ErrorCode.Message);
+      CheckTrue(Res.Success, 'Error: ' + Res.Message);
       CheckEquals(42, BytesTransferred, 'BytesTransferred incorrect');
     end;
 
@@ -100,10 +100,10 @@ begin
   Buffer := data;
 
   Handler :=
-    procedure(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64)
+    procedure(const Res: OpResult; const BytesTransferred: UInt64)
     begin
       FHandlerExecuted := True;
-      CheckFalse(ErrorCode, 'Error: ' + ErrorCode.Message);
+      CheckTrue(Res.Success, 'Error: ' + Res.Message);
       CheckEquals(42, BytesTransferred, 'BytesTransferred incorrect');
     end;
 

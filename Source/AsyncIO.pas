@@ -20,12 +20,12 @@ uses
   WinAPI.Windows,
   System.SysUtils,
   System.Classes,
-  AsyncIO.ErrorCodes;
+  AsyncIO.OpResults;
 
 type
   CompletionHandler = reference to procedure;
-  OpHandler = reference to procedure(const ErrorCode: IOErrorCode);
-  IOHandler = reference to procedure(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64);
+  OpHandler = reference to procedure(const Res: OpResult);
+  IOHandler = reference to procedure(const Res: OpResult; const BytesTransferred: UInt64);
 
 type
   EIOServiceStopped = class(Exception);
@@ -161,7 +161,7 @@ type
   end;
 
   // returns 0 if io operation is complete, otherwise the maximum number of bytes for the subsequent request
-  IOCompletionCondition = reference to function(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64): UInt64;
+  IOCompletionCondition = reference to function(const Res: OpResult; const BytesTransferred: UInt64): UInt64;
 
 function MakeBuffer(const Buffer: MemoryBuffer; const MaxSize: cardinal): MemoryBuffer; overload;
 function MakeBuffer(const Data: pointer; const Size: cardinal): MemoryBuffer; overload;
@@ -220,27 +220,27 @@ end;
 function TransferAll: IOCompletionCondition;
 begin
   result :=
-    function(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64): UInt64
+    function(const Res: OpResult; const BytesTransferred: UInt64): UInt64
     begin
-      result := IfThen((not ErrorCode), MaxTransferSize, 0);
+      result := IfThen(Res.Success, MaxTransferSize, 0);
     end;
 end;
 
 function TransferAtLeast(const Minimum: UInt64): IOCompletionCondition;
 begin
   result :=
-    function(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64): UInt64
+    function(const Res: OpResult; const BytesTransferred: UInt64): UInt64
     begin
-      result := IfThen((not ErrorCode) and (BytesTransferred < Minimum), MaxTransferSize, 0);
+      result := IfThen(Res.Success and (BytesTransferred < Minimum), MaxTransferSize, 0);
     end;
 end;
 
 function TransferExactly(const Size: UInt64): IOCompletionCondition;
 begin
   result :=
-    function(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64): UInt64
+    function(const Res: OpResult; const BytesTransferred: UInt64): UInt64
     begin
-      result := IfThen((not ErrorCode) and (BytesTransferred < Size), Min(Size - BytesTransferred, MaxTransferSize), 0);
+      result := IfThen(Res.Success and (BytesTransferred < Size), Min(Size - BytesTransferred, MaxTransferSize), 0);
     end;
 end;
 
@@ -254,7 +254,7 @@ type
     FCompletionCondition: IOCompletionCondition;
     FHandler: IOHandler;
 
-    procedure Invoke(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64);
+    procedure Invoke(const Res: OpResult; const BytesTransferred: UInt64);
   public
     constructor Create(const Stream: AsyncStream; const Buffer: MemoryBuffer; const CompletionCondition: IOCompletionCondition; const Handler: IOHandler);
   end;
@@ -274,7 +274,7 @@ begin
   FHandler := Handler;
 end;
 
-procedure AsyncReadOp.Invoke(const ErrorCode: IOErrorCode;
+procedure AsyncReadOp.Invoke(const Res: OpResult;
   const BytesTransferred: UInt64);
 var
   n: UInt64;
@@ -284,10 +284,10 @@ begin
 
   readMore := True;
 
-  if ((ErrorCode = IOErrorCode.Success) and (BytesTransferred = 0)) then
+  if (Res.Success and (BytesTransferred = 0)) then
     readMore := False;
 
-  n := FCompletionCondition(ErrorCode, FTotalBytesTransferred);
+  n := FCompletionCondition(Res, FTotalBytesTransferred);
   if (n = 0) or (FTotalBytesTransferred = FBuffer.Size) then
     readMore := False;
 
@@ -297,7 +297,7 @@ begin
   end
   else
   begin
-    FHandler(ErrorCode, FTotalBytesTransferred);
+    FHandler(Res, FTotalBytesTransferred);
   end;
 end;
 
@@ -306,14 +306,14 @@ var
   n: UInt64;
   readOp: IOHandler;
 begin
-  n := CompletionCondition(IOErrorCode.Success, 0);
+  n := CompletionCondition(GenericResults.Success, 0);
 
   if (n = 0) then
   begin
     Stream.Service.Post(
       procedure
       begin
-        Handler(IOErrorCode.Success, 0);
+        Handler(GenericResults.Success, 0);
       end
     );
     exit;
@@ -332,7 +332,7 @@ type
     FCompletionCondition: IOCompletionCondition;
     FHandler: IOHandler;
 
-    procedure Invoke(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64);
+    procedure Invoke(const Res: OpResult; const BytesTransferred: UInt64);
   public
     constructor Create(const Stream: AsyncStream; const Buffer: StreamBuffer; const CompletionCondition: IOCompletionCondition; const Handler: IOHandler);
   end;
@@ -352,7 +352,7 @@ begin
   FHandler := Handler;
 end;
 
-procedure AsyncReadStreamAdapterOp.Invoke(const ErrorCode: IOErrorCode;
+procedure AsyncReadStreamAdapterOp.Invoke(const Res: OpResult;
   const BytesTransferred: UInt64);
 var
   n: UInt64;
@@ -365,10 +365,10 @@ begin
 
   readMore := True;
 
-  if ((ErrorCode = IOErrorCode.Success) and (BytesTransferred = 0)) then
+  if (Res.Success and (BytesTransferred = 0)) then
     readMore := False;
 
-  n := FCompletionCondition(ErrorCode, FTotalBytesTransferred);
+  n := FCompletionCondition(Res, FTotalBytesTransferred);
   n := Min(n, FBuffer.MaxBufferSize - FBuffer.BufferSize);
   if (n = 0) then
     readMore := False;
@@ -380,7 +380,7 @@ begin
   end
   else
   begin
-    FHandler(ErrorCode, FTotalBytesTransferred);
+    FHandler(Res, FTotalBytesTransferred);
   end;
 end;
 
@@ -390,7 +390,7 @@ var
   readOp: IOHandler;
   buf: MemoryBuffer;
 begin
-  n := CompletionCondition(IOErrorCode.Success, 0);
+  n := CompletionCondition(GenericResults.Success, 0);
   n := Min(n, Buffer.MaxBufferSize);
 
   if (n = 0) then
@@ -398,7 +398,7 @@ begin
     Stream.Service.Post(
       procedure
       begin
-        Handler(IOErrorCode.Success, 0);
+        Handler(GenericResults.Success, 0);
       end
     );
     exit;
@@ -420,7 +420,7 @@ type
     FDelim: TBytes;
     FHandler: IOHandler;
 
-    procedure Invoke(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64);
+    procedure Invoke(const Res: OpResult; const BytesTransferred: UInt64);
   public
     constructor Create(const Stream: AsyncStream; const Buffer: StreamBuffer; const Delim: TArray<Byte>; const Handler: IOHandler);
   end;
@@ -491,7 +491,7 @@ begin
   FHandler := Handler;
 end;
 
-procedure AsyncReadUntilDelimOp.Invoke(const ErrorCode: IOErrorCode;
+procedure AsyncReadUntilDelimOp.Invoke(const Res: OpResult;
   const BytesTransferred: UInt64);
 var
   n: UInt64;
@@ -506,7 +506,7 @@ begin
 
   readMore := True;
 
-  if ((ErrorCode) or (BytesTransferred = 0)) then
+  if ((not Res.Success) or (BytesTransferred = 0)) then
     readMore := False;
 
   match := PartialSearch(PByte(FBuffer) + FSearchPosition, FSearchPosition - FBuffer.BufferSize, FDelim, matchPos);
@@ -550,8 +550,8 @@ begin
   else
   begin
     // write what we have to the destination stream
-    n := IfThen((not ErrorCode) and match, FSearchPosition, 0);
-    FHandler(ErrorCode, n);
+    n := IfThen(Res.Success and match, FSearchPosition, 0);
+    FHandler(Res, n);
   end;
 end;
 
@@ -589,7 +589,7 @@ type
     FCompletionCondition: IOCompletionCondition;
     FHandler: IOHandler;
 
-    procedure Invoke(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64);
+    procedure Invoke(const Res: OpResult; const BytesTransferred: UInt64);
   public
     constructor Create(const Stream: AsyncStream; const Buffer: MemoryBuffer; const CompletionCondition: IOCompletionCondition; const Handler: IOHandler);
   end;
@@ -609,7 +609,7 @@ begin
   FHandler := Handler;
 end;
 
-procedure AsyncWriteOp.Invoke(const ErrorCode: IOErrorCode;
+procedure AsyncWriteOp.Invoke(const Res: OpResult;
   const BytesTransferred: UInt64);
 var
   n: UInt64;
@@ -619,10 +619,10 @@ begin
 
   writeMore := True;
 
-  if ((ErrorCode) or (BytesTransferred = 0)) then
+  if ((not Res.Success) or (BytesTransferred = 0)) then
     writeMore := False;
 
-  n := FCompletionCondition(ErrorCode, FTotalBytesTransferred);
+  n := FCompletionCondition(Res, FTotalBytesTransferred);
   if (n = 0) or (FTotalBytesTransferred = FBuffer.Size) then
     writeMore := False;
 
@@ -632,7 +632,7 @@ begin
   end
   else
   begin
-    FHandler(ErrorCode, FTotalBytesTransferred);
+    FHandler(Res, FTotalBytesTransferred);
   end;
 end;
 
@@ -641,14 +641,14 @@ var
   n: UInt64;
   writeOp: IOHandler;
 begin
-  n := CompletionCondition(IOErrorCode.Success, 0);
+  n := CompletionCondition(GenericResults.Success, 0);
 
   if (n = 0) then
   begin
     Stream.Service.Post(
       procedure
       begin
-        Handler(IOErrorCode.Success, 0);
+        Handler(GenericResults.Success, 0);
       end
     );
     exit;
@@ -667,7 +667,7 @@ type
     FCompletionCondition: IOCompletionCondition;
     FHandler: IOHandler;
 
-    procedure Invoke(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64);
+    procedure Invoke(const Res: OpResult; const BytesTransferred: UInt64);
   public
     constructor Create(const Stream: AsyncStream; const Buffer: StreamBuffer; const CompletionCondition: IOCompletionCondition; const Handler: IOHandler);
   end;
@@ -687,7 +687,7 @@ begin
   FHandler := Handler;
 end;
 
-procedure AsyncWriteStreamAdapterOp.Invoke(const ErrorCode: IOErrorCode;
+procedure AsyncWriteStreamAdapterOp.Invoke(const Res: OpResult;
   const BytesTransferred: UInt64);
 var
   n: UInt64;
@@ -700,10 +700,10 @@ begin
 
   readMore := True;
 
-  if ((ErrorCode) or (BytesTransferred = 0)) then
+  if ((not Res.Success) or (BytesTransferred = 0)) then
     readMore := False;
 
-  n := FCompletionCondition(ErrorCode, FTotalBytesTransferred);
+  n := FCompletionCondition(Res, FTotalBytesTransferred);
   n := Min(n, FBuffer.BufferSize);
   if (n = 0) then
     readMore := False;
@@ -715,7 +715,7 @@ begin
   end
   else
   begin
-    FHandler(ErrorCode, FTotalBytesTransferred);
+    FHandler(Res, FTotalBytesTransferred);
   end;
 end;
 
@@ -725,7 +725,7 @@ var
   writeOp: IOHandler;
   buf: MemoryBuffer;
 begin
-  n := CompletionCondition(IOErrorCode.Success, 0);
+  n := CompletionCondition(GenericResults.Success, 0);
   n := Min(n, Buffer.BufferSize);
 
   if (n = 0) then
@@ -733,7 +733,7 @@ begin
     Stream.Service.Post(
       procedure
       begin
-        Handler(IOErrorCode.Success, 0);
+        Handler(GenericResults.Success, 0);
       end
     );
     exit;
