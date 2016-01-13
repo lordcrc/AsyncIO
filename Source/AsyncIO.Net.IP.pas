@@ -406,6 +406,7 @@ type
 
   NetResults = record
     class function Success: OpResult; static;
+    class function LastError: OpResult; static;
     class function OperationAborted: OpResult; static;
     class function NoBuffersAvailable: OpResult; static;
     class function AccessDenied: OpResult; static;
@@ -1531,6 +1532,11 @@ end;
 class function NetResults.IsConnected: OpResult;
 begin
   result := NetResult(WSAEISCONN);
+end;
+
+class function NetResults.LastError: OpResult;
+begin
+  result := NetResult(WSAGetLastError());
 end;
 
 class function NetResults.NetworkDown: OpResult;
