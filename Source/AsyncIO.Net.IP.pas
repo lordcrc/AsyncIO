@@ -492,7 +492,7 @@ class operator IPv4Address.Implicit(const IPAddress: IPv4Address): string;
 var
   sockAddr: TSockAddr;
   len: cardinal;
-  res: WinsockResult;
+  res: OpResult;
 begin
   FillChar(sockAddr, SizeOf(TSockAddr), 0);
 
@@ -502,7 +502,9 @@ begin
   SetLength(result, 32);
   len := Length(result);
 
-  res := WSAAddressToString(@sockAddr, SizeOf(sockAddr), nil, @result[1], len);
+  res := WinsockResult(WSAAddressToString(@sockAddr, SizeOf(sockAddr), nil, @result[1], len));
+  if (not res.Success) then
+    res.RaiseException();
 
   SetLength(result, len-1);
 end;
@@ -614,7 +616,7 @@ class operator IPv6Address.Implicit(const IPAddress: IPv6Address): string;
 var
   sockAddr: TSockAddrIn6;
   len: cardinal;
-  res: WinsockResult;
+  res: OpResult;
 begin
   FillChar(sockAddr, SizeOf(TSockAddr), 0);
 
@@ -625,7 +627,9 @@ begin
   SetLength(result, 256);
   len := Length(result);
 
-  res := WSAAddressToString(@sockAddr, SizeOf(sockAddr), nil, @result[1], len);
+  res := WinsockResult(WSAAddressToString(@sockAddr, SizeOf(sockAddr), nil, @result[1], len));
+  if (not res.Success) then
+    res.RaiseException();
 
   SetLength(result, len-1);
 end;
@@ -1381,10 +1385,10 @@ type
     lpCompletionRoutine : LPLOOKUPSERVICE_COMPLETION_ROUTINE;
     lpNameHandle : PHandle) : Integer; stdcall;
 var
-  res: GetAddrResult;
+  res: OpResult;
   addr: PAddressInfo;
 begin
-  res := LPFN_GETADDRINFOEX(GetAddrInfoEx)(
+  res := GetAddrResult(LPFN_GETADDRINFOEX(GetAddrInfoEx)(
     PChar(ResolveQuery.HostName),
     PChar(ResolveQuery.ServiceName),
     NS_ALL,
@@ -1394,7 +1398,10 @@ begin
     nil,
     nil,
     nil,
-    nil);
+    nil));
+
+  if (not res.Success) then
+    res.RaiseException();
 
   try
     result := Results.Create(ResolveQuery.HostName, ResolveQuery.ServiceName, addr);

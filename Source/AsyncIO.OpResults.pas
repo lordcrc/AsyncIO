@@ -86,20 +86,6 @@ type
 
 function SystemResult(const ResultValue: DWORD): OpResult;
 
-type
-  WinsockResult = record
-    Value: integer;
-
-    class operator Implicit(const Value: integer): WinsockResult;
-  end;
-
-type
-  GetAddrResult = record
-    Value: integer;
-
-    class operator Implicit(const Value: integer): GetAddrResult;
-  end;
-
 implementation
 
 uses
@@ -149,26 +135,6 @@ end;
 procedure OpResult.RaiseException(const AdditionalInfo: string);
 begin
   Category.RaiseException(Value, AdditionalInfo);
-end;
-
-{ WinsockResult }
-
-class operator WinsockResult.Implicit(const Value: integer): WinsockResult;
-begin
-  if (Value = SOCKET_ERROR) then
-    RaiseLastOSError(WSAGetLastError);
-
-  result.Value := Value;
-end;
-
-{ GetAddrResult }
-
-class operator GetAddrResult.Implicit(const Value: integer): GetAddrResult;
-begin
-  if (Value <> 0) then
-    RaiseLastOSError(WSAGetLastError);
-
-  result.Value := Value;
 end;
 
 type

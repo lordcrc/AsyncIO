@@ -35,6 +35,10 @@ type
 
 function DefaultConnectCondition(const Res: OpResult; const Endpoint: IPEndpoint): boolean;
 
+// result helpers
+function WinsockResult(const ResultValue: integer): OpResult;
+function GetAddrResult(const ResultValue: integer): OpResult;
+
 implementation
 
 procedure IPSocketAssign(const Socket: IPSocket; const Protocol: IPProtocol; const SocketHandle: TSocket);
@@ -48,6 +52,22 @@ end;
 function DefaultConnectCondition(const Res: OpResult; const Endpoint: IPEndpoint): boolean;
 begin
   result := True;
+end;
+
+function WinsockResult(const ResultValue: integer): OpResult;
+begin
+  if (ResultValue = SOCKET_ERROR) then
+    result := NetResults.LastError
+  else
+    result := NetResults.Success;
+end;
+
+function GetAddrResult(const ResultValue: integer): OpResult;
+begin
+  if (ResultValue <> 0) then
+    result := NetResults.LastError
+  else
+    result := NetResults.Success;
 end;
 
 { AsyncSocketStreamImpl }

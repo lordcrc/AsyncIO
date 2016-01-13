@@ -217,7 +217,7 @@ end;
 
 procedure TTCPSocketImpl.Bind(const LocalEndpoint: IPEndpoint);
 var
-  res: WinsockResult;
+  res: OpResult;
 begin
   if (LocalEndpoint.IsIPv4) then
     FProtocol := IPProtocol.TCP.v4
@@ -229,23 +229,29 @@ begin
   if not SocketInitialized then
     CreateSocket;
 
-  res := IdWinsock2.bind(SocketHandle, LocalEndpoint.Data, LocalEndpoint.DataLength);
+  res := WinsockResult(IdWinsock2.bind(SocketHandle, LocalEndpoint.Data, LocalEndpoint.DataLength));
+  if (not res.Success) then
+    res.RaiseException();
 end;
 
 procedure TTCPSocketImpl.Close;
 var
   s: TSocket;
-  res: WinSockResult;
+  res: OpResult;
 begin
   s := FSocketHandle;
   ResetSocket;
   if (s <> INVALID_SOCKET) then
-    res := IdWinsock2.closesocket(s)
+  begin
+    res := WinsockResult(IdWinsock2.closesocket(s));
+    if (not res.Success) then
+      res.RaiseException();
+  end;
 end;
 
 procedure TTCPSocketImpl.Connect(const PeerEndpoint: IPEndpoint);
 var
-  res: WinSockResult;
+  res: OpResult;
 begin
   if (PeerEndpoint.IsIPv4) then
     FProtocol := IPProtocol.TCP.v4
@@ -257,7 +263,9 @@ begin
   if not SocketInitialized then
     CreateSocket;
 
-  res := IdWinsock2.connect(SocketHandle, PeerEndpoint.Data, PeerEndpoint.DataLength);
+  res := WinsockResult(IdWinsock2.connect(SocketHandle, PeerEndpoint.Data, PeerEndpoint.DataLength));
+  if (not res.Success) then
+    res.RaiseException();
 end;
 
 constructor TTCPSocketImpl.Create(const Service: IOService);
@@ -278,7 +286,7 @@ begin
 
   FSocketHandle := IdWinsock2.socket(Protocol.Family, Protocol.SocketType, Protocol.Protocol);
   if (FSocketHandle = INVALID_SOCKET) then
-    RaiseLastOSError(WSAGetLastError, 'CreateSocket (TCP)');
+    NetResults.LastError.RaiseException('CreateSocket (TCP)');
 
   IOServiceAssociateHandle(Service, SocketHandle);
 end;
@@ -295,12 +303,14 @@ function TTCPSocketImpl.GetLocalEndpoint: IPEndpoint;
 var
   addr: TSockAddrIn6;
   addrlen: integer;
-  res: WinSockResult;
+  res: OpResult;
 begin
   FillChar(addr, SizeOf(addr), 0);
   addrlen := SizeOf(addr);
 
-  res := IdWinsock2.getsockname(SocketHandle, @addr, addrlen);
+  res := WinsockResult(IdWinsock2.getsockname(SocketHandle, @addr, addrlen));
+  if (not res.Success) then
+    res.RaiseException();
 
   result := IPEndpoint.FromData(addr, addrlen);
 end;
@@ -314,12 +324,14 @@ function TTCPSocketImpl.GetRemoteEndpoint: IPEndpoint;
 var
   addr: TSockAddrIn6;
   addrlen: integer;
-  res: WinSockResult;
+  res: OpResult;
 begin
   FillChar(addr, SizeOf(addr), 0);
   addrlen := SizeOf(addr);
 
-  res := IdWinsock2.getpeername(SocketHandle, @addr, addrlen);
+  res := WinsockResult(IdWinsock2.getpeername(SocketHandle, @addr, addrlen));
+  if (not res.Success) then
+    res.RaiseException();
 
   result := IPEndpoint.FromData(addr, addrlen);
 end;
@@ -388,10 +400,7 @@ begin
       begin
         // update socket options, need to associate the listen socket with the accept socket
         // AcceptEx requires this for getsockname/getpeername
-        err := IdWinsock2.setsockopt(Peer.SocketHandle, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, @listenSocket, SizeOf(listenSocket));
-        if (err <> 0) then
-          // set code from GetLastError
-          r := SystemResults.LastError;
+        r := WinsockResult(IdWinsock2.setsockopt(Peer.SocketHandle, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT, @listenSocket, SizeOf(listenSocket)));
       end;
 
       // if connect succeeded but setsockopt failed, pass the error from the latter
@@ -419,7 +428,7 @@ end;
 
 procedure TTCPAcceptorImpl.Bind(const LocalEndpoint: IPEndpoint);
 var
-  res: WinsockResult;
+  res: OpResult;
 begin
   if (LocalEndpoint.IsIPv4) then
     FProtocol := IPProtocol.TCP.v4
@@ -431,7 +440,9 @@ begin
   if (not IsOpen) then
     Open(Protocol);
 
-  res := IdWinsock2.bind(SocketHandle, LocalEndpoint.Data, LocalEndpoint.DataLength);
+  res := WinsockResult(IdWinsock2.bind(SocketHandle, LocalEndpoint.Data, LocalEndpoint.DataLength));
+  if (not res.Success) then
+    res.RaiseException();
 end;
 
 procedure TTCPAcceptorImpl.Close;
@@ -445,10 +456,14 @@ end;
 
 procedure TTCPAcceptorImpl.CloseSocket(const SocketHandle: TSocket);
 var
-  res: WinSockResult;
+  res: OpResult;
 begin
-  if (SocketHandle <> INVALID_SOCKET) then
-    res := IdWinsock2.closesocket(SocketHandle)
+  if (SocketHandle = INVALID_SOCKET) then
+    exit;
+
+  res := WinsockResult(IdWinsock2.closesocket(SocketHandle));
+  if (not res.Success) then
+    res.RaiseException();
 end;
 
 constructor TTCPAcceptorImpl.Create(const Service: IOService);
@@ -463,7 +478,7 @@ function TTCPAcceptorImpl.CreateSocket: TSocket;
 begin
   result := IdWinsock2.socket(Protocol.Family, Protocol.SocketType, Protocol.Protocol);
   if (result = INVALID_SOCKET) then
-    RaiseLastOSError(WSAGetLastError, 'CreateSocket (TCP)');
+    NetResults.LastError.RaiseException('CreateSocket (TCP)');
 end;
 
 destructor TTCPAcceptorImpl.Destroy;
@@ -483,12 +498,14 @@ function TTCPAcceptorImpl.GetLocalEndpoint: IPEndpoint;
 var
   addr: TSockAddrIn6;
   addrlen: integer;
-  res: WinSockResult;
+  res: OpResult;
 begin
   FillChar(addr, SizeOf(addr), 0);
   addrlen := SizeOf(addr);
 
-  res := IdWinsock2.getsockname(SocketHandle, @addr, addrlen);
+  res := WinsockResult(IdWinsock2.getsockname(SocketHandle, @addr, addrlen));
+  if (not res.Success) then
+    res.RaiseException();
 
   result := IPEndpoint.FromData(addr, addrlen);
 end;
@@ -505,9 +522,11 @@ end;
 
 procedure TTCPAcceptorImpl.Listen(const Backlog: integer);
 var
-  res: WinsockResult;
+  res: OpResult;
 begin
-  res := IdWinsock2.listen(SocketHandle, Backlog);
+  res := WinsockResult(IdWinsock2.listen(SocketHandle, Backlog));
+  if (not res.Success) then
+    res.RaiseException();
 end;
 
 procedure TTCPAcceptorImpl.Listen;
