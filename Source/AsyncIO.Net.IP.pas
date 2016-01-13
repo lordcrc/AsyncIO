@@ -1602,6 +1602,7 @@ begin
   begin
     case ResultValue of
       ERROR_SUCCESS: result := (OtherResult = SystemResults.Success);
+      WSA_OPERATION_ABORTED: result := (OtherResult = SystemResults.OperationAborted);
     end;
   end;
 end;
