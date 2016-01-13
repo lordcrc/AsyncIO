@@ -394,7 +394,9 @@ procedure AsyncConnect(const Socket: IPSocket; const Endpoints: IPResolver.Resul
 procedure AsyncConnect(const Socket: IPSocket; const Endpoints: TArray<IPEndpoint>; const Condition: ConnectCondition; const Handler: ConnectHandler); overload;
 
 type
-  ENetException = class(Exception);
+  ENetException = class(EOSError)
+    constructor Create(const ResultValue: integer; const Msg: string);
+  end;
 
   NetIPCategory = class(OpResultCategory)
   public
@@ -1482,6 +1484,15 @@ begin
   connectOp(SystemResults.Success);
 end;
 
+{ ENetException }
+
+constructor ENetException.Create(const ResultValue: integer;
+  const Msg: string);
+begin
+  inherited Create(Msg);
+  ErrorCode := DWORD(ResultValue);
+end;
+
 { NetResults }
 
 class function NetResults.AccessDenied: OpResult;
@@ -1607,7 +1618,7 @@ end;
 
 class procedure NetIPCategory.RaiseException(const ResultValue: integer; const AdditionalInfo: string);
 begin
-  raise ENetException.Create(Message(ResultValue) + AdditionalInfo);
+  raise ENetException.Create(ResultValue, Message(ResultValue) + AdditionalInfo);
 end;
 
 initialization
