@@ -40,7 +40,7 @@ procedure RemoveHttpConnection(const Connection: HttpConnection; const Connectio
 implementation
 
 uses
-  System.Generics.Collections, AsyncIO.ErrorCodes,
+  System.Generics.Collections, AsyncIO.OpResults,
   AsyncHttpServer.RequestParser, AsyncHttpServer.Headers, HttpDateTime;
 
 type
@@ -79,11 +79,11 @@ type
     procedure HandleRequest;
     procedure HandleInvalidRequest;
 
-    procedure ReadRequestHandler(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64);
-    procedure WriteResponseHandler(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64);
+    procedure ReadRequestHandler(const Res: OpResult; const BytesTransferred: UInt64);
+    procedure WriteResponseHandler(const Res: OpResult; const BytesTransferred: UInt64);
 
-    procedure ReadResponseContentHandler(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64);
-    procedure WriteResponseContentHandler(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64);
+    procedure ReadResponseContentHandler(const Res: OpResult; const BytesTransferred: UInt64);
+    procedure WriteResponseContentHandler(const Res: OpResult; const BytesTransferred: UInt64);
   public
     constructor Create(const Socket: IPStreamSocket; const ConnectionManager: HttpConnectionManager; const RequestHandler: HttpRequestHandler; const RequestParser: HttpRequestParser);
 
@@ -244,15 +244,15 @@ begin
   WriteLn('[' + FormatDateTime('yyyy.mm.dd hh:nn:ss.zzz', Now()) + '] ' + FSocket.RemoteEndpoint + ' | ' + Msg);
 end;
 
-procedure HttpConnectionImpl.ReadRequestHandler(const ErrorCode: IOErrorCode;
+procedure HttpConnectionImpl.ReadRequestHandler(const Res: OpResult;
   const BytesTransferred: UInt64);
 begin
-  if ((ErrorCode = IOErrorCode.Success) and (BytesTransferred > 0))  then
+  if ((Res.Success) and (BytesTransferred > 0))  then
   begin
     // we got at least some data forming the request, parse it and handle response if possible
     DoParseRequest();
   end
-  else if ((ErrorCode = IOErrorCode.OperationAborted) or (BytesTransferred = 0)) then
+  else if ((Res = NetResults.OperationAborted) or (BytesTransferred = 0)) then
   begin
     // socket has been closed or shut down
     DoStopConnection;
@@ -261,9 +261,9 @@ begin
 end;
 
 procedure HttpConnectionImpl.ReadResponseContentHandler(
-  const ErrorCode: IOErrorCode; const BytesTransferred: UInt64);
+  const Res: OpResult; const BytesTransferred: UInt64);
 begin
-  if ((ErrorCode = IOErrorCode.Success) or (ErrorCode = IOErrorCode.EndOfFile)) then
+  if ((Res.Success) or (Res = SystemResults.EndOfFile)) then
   begin
     if (BytesTransferred > 0) then
     begin
@@ -317,11 +317,11 @@ begin
 end;
 
 procedure HttpConnectionImpl.WriteResponseContentHandler(
-  const ErrorCode: IOErrorCode; const BytesTransferred: UInt64);
+  const Res: OpResult; const BytesTransferred: UInt64);
 var
   con: HttpConnection;
 begin
-  if (ErrorCode = IOErrorCode.Success) then
+  if (Res.Success) then
   begin
     // response content stream data has been sent, so try reading some more
     DoReadResponseContent;
@@ -330,7 +330,7 @@ begin
   begin
     FSocket.Shutdown(SocketShutdownBoth);
 
-    if (ErrorCode = IOErrorCode.OperationAborted) then
+    if (Res = NetResults.OperationAborted) then
     begin
       con := Self;
       RemoveHttpConnection(con, ConnectionManager);
@@ -338,10 +338,10 @@ begin
   end;
 end;
 
-procedure HttpConnectionImpl.WriteResponseHandler(const ErrorCode: IOErrorCode;
+procedure HttpConnectionImpl.WriteResponseHandler(const Res: OpResult;
   const BytesTransferred: UInt64);
 begin
-  if (ErrorCode = IOErrorCode.Success) then
+  if (Res.Success) then
   begin
     // response has been sent, send response content stream if applicable
     StartWriteResponseContent;
@@ -350,7 +350,7 @@ begin
   begin
     FSocket.Shutdown(SocketShutdownBoth);
 
-    if (ErrorCode = IOErrorCode.OperationAborted) then
+    if (Res = NetResults.OperationAborted) then
     begin
       DoStopConnection;
     end;

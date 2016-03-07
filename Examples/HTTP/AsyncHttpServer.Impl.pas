@@ -22,7 +22,7 @@ function NewAsyncHttpSrv(const LocalAddress: string; const Port: integer; const 
 implementation
 
 uses
-  AsyncIO.ErrorCodes, AsyncHttpServer.Connection,
+  AsyncIO.OpResults, AsyncHttpServer.Connection,
   AsyncHttpServer.RequestHandler;
 
 type
@@ -41,7 +41,7 @@ type
 
     procedure DoAccept;
 
-    procedure AcceptHandler(const ErrorCode: IOErrorCode);
+    procedure AcceptHandler(const Res: OpResult);
   public
     constructor Create(const Service: IOService; const Endpoint: IPEndpoint; const DocRoot: string; const Mime: MimeRegistry);
 
@@ -80,7 +80,7 @@ end;
 
 { AsyncHttpSrvImpl }
 
-procedure AsyncHttpSrvImpl.AcceptHandler(const ErrorCode: IOErrorCode);
+procedure AsyncHttpSrvImpl.AcceptHandler(const Res: OpResult);
 var
   connection: HttpConnection;
 begin
@@ -88,9 +88,9 @@ begin
   if (not FAcceptor.IsOpen) then
     exit;
 
-  if (ErrorCode = IOErrorCode.Success) then
+  if (Res.Success) then
   begin
-{$IFDEF DEBUG}
+{$IFDEF DEBUG_LOG}
     Log('Accepted connection from ' + FSocket.RemoteEndpoint);
 {$ENDIF}
 
