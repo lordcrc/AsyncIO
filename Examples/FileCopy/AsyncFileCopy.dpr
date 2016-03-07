@@ -14,7 +14,10 @@ uses
   AsyncIO.Filesystem.Detail in '..\..\Source\AsyncIO.Filesystem.Detail.pas',
   AsyncIO.Filesystem in '..\..\Source\AsyncIO.Filesystem.pas',
   AsyncIO in '..\..\Source\AsyncIO.pas',
-  AsyncFileCopy.Impl in 'AsyncFileCopy.Impl.pas';
+  AsyncFileCopy.Impl in 'AsyncFileCopy.Impl.pas',
+  AsyncIO.Coroutine in '..\..\Source\AsyncIO.Coroutine.pas',
+  AsyncIO.Coroutine.Detail in '..\..\Source\AsyncIO.Coroutine.Detail.pas',
+  AsyncIO.Coroutine.Detail.Fiber in '..\..\Source\AsyncIO.Coroutine.Detail.Fiber.pas';
 
 procedure PrintUsage;
 begin
@@ -32,7 +35,6 @@ var
   ios: IOService;
   copier: AsyncFileCopier;
   progressHandler: IOProgressHandler;
-  r: Int64;
   startTime: TDateTime;
 begin
   progressHandler :=
@@ -52,14 +54,8 @@ begin
   ios := NewIOService();
   copier := NewAsyncFileCopier(ios, progressHandler, 4096);
 
-  copier.Execute(SourceFilename, DestFilename);
-
   startTime := Now();
-
-  r := ios.Run;
-
-  WriteLn;
-  WriteLn(Format('%d handlers executed', [r]));
+  copier.Execute(SourceFilename, DestFilename);
 end;
 
 begin
