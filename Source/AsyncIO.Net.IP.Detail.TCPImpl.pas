@@ -384,7 +384,6 @@ begin
   ctx := OpHandlerContext.Create(
     procedure(const Res: OpResult)
     var
-      err: DWORD;
       r: OpResult;
     begin
       r := Res;
