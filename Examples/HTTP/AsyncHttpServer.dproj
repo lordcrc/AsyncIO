@@ -62,7 +62,7 @@
         <DCC_UsePackage>DBXSqliteDriver;bindcompdbx;fmxase;DBXDb2Driver;DBXInterBaseDriver;vcl;DBXSybaseASEDriver;vclactnband;IndyIPCommon;vclFireDAC;IndySystem;IndyIPServer;FireDACDb2Driver;RESTComponents;emsclientfiredac;DataSnapFireDAC;tethering;dsnapcon;FireDACADSDriver;FireDACMSAccDriver;fmxFireDAC;DBXMSSQLDriver;vclimg;FireDACInfxDriver;DatasnapConnectorsFreePascal;FireDAC;FireDACMSSQLDriver;vcltouch;vcldb;bindcompfmx;FireDACSqliteDriver;FireDACPgDriver;DBXOracleDriver;FireDACASADriver;inetdb;DBXOdbcDriver;FireDACTDataDriver;soaprtl;DbxCommonDriver;FireDACIBDriver;fmx;DataSnapServer;xmlrtl;soapmidas;DataSnapNativeClient;fmxobj;fmxdae;vclwinx;rtl;FireDACDSDriver;DbxClientDriver;DBXSybaseASADriver;CustomIPTransport;vcldsnap;dbexpress;IndyCore;FireDACDBXDriver;vclx;bindcomp;appanalytics;dsnap;DataSnapCommon;DBXInformixDriver;FireDACCommon;IndyIPClient;emsclient;bindcompvcl;RESTBackendComponents;DataSnapConnectors;VCLRESTComponents;vclribbon;dbxcds;VclSmp;soapserver;adortl;FireDACODBCDriver;DataSnapIndy10ServerTransport;vclie;bindengine;DBXMySQLDriver;FireDACOracleDriver;dsnapxml;FireDACMySQLDriver;dbrtl;inetdbxpress;DBXFirebirdDriver;DataSnapProviderClient;FireDACMongoDBDriver;IndyProtocols;FireDACCommonDriver;CloudService;DataSnapClient;inet;DataSnapServerMidas;$(DCC_UsePackage)</DCC_UsePackage>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1)'!=''">
-        <DCC_Define>DEBUG;$(DCC_Define)</DCC_Define>
+        <DCC_Define>DEBUG;DEBUG_LOG;LOG_DETAILED;$(DCC_Define)</DCC_Define>
         <DCC_DebugDCUs>true</DCC_DebugDCUs>
         <DCC_Optimize>false</DCC_Optimize>
         <DCC_GenerateStackFrames>true</DCC_GenerateStackFrames>

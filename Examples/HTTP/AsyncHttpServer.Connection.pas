@@ -212,16 +212,24 @@ procedure HttpConnectionImpl.HandleRequest;
 begin
   // we've got a valid request, we need to handle it and send the response
 
-{$IFDEF DEBUG}
+{$IFDEF DEBUG_LOG}
+{$IFDEF LOG_DETAILED}
   Log(Format(#13#10 + '  %s %s HTTP/%d.%d', [FRequest.Method, FRequest.URI, FRequest.HttpVersionMajor, FRequest.HttpVersionMinor]) + FRequest.Headers.ToDebugString());
+{$ELSE}
+  Log(FRequest.Method + ' ' + FRequest.URI + ' HTTP/' + FRequest.HttpVersionMajor.ToString() + '.' + FRequest.HttpVersionMinor.ToString());
+{$ENDIF}
 {$ENDIF}
 
   try
     // get the response from our request handler
     FResponse := RequestHandler.HandleRequest(FRequest);
 
-{$IFDEF DEBUG}
+{$IFDEF DEBUG_LOG}
+{$IFDEF LOG_DETAILED}
     Log(Format(#13#10 + '  %d %s', [Ord(FResponse.Status), FResponse.Status.ToString()]) + FResponse.Headers.ToDebugString());
+{$ELSE}
+  Log(Ord(FResponse.Status).ToString() + ' ' + FResponse.Status.ToString());
+{$ENDIF}
 {$ENDIF}
   except
     on E: Exception do
