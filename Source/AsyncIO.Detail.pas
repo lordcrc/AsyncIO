@@ -205,7 +205,7 @@ class function IOCPContext.FromOverlapped(const Overlapped: POverlapped): IOCPCo
 type
   PUInt8 = ^UInt8;
 begin
-  result := TObject(PUInt8(Overlapped) - 4) as IOCPContext;
+  result := TObject(PUInt8(Overlapped) - SizeOf(pointer)) as IOCPContext;
 end;
 
 function IOCPContext.GetOverlapped: POverlapped;
