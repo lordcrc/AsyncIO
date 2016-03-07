@@ -3,7 +3,7 @@ unit AsyncHttpClient.Impl;
 interface
 
 uses
-  System.SysUtils, AsyncIO, AsyncIO.ErrorCodes, AsyncIO.Net.IP;
+  System.SysUtils, AsyncIO, AsyncIO.OpResults, AsyncIO.Net.IP;
 
 type
   HttpClientProgressHandler = reference to procedure(const Status: string);
@@ -45,10 +45,10 @@ type
     FStream: AsyncSocketStream;
     FResponseBuffer: StreamBuffer;
 
-    function ConnectCondition(const ErrorCode: IOErrorCode; const Endpoint: IPEndpoint): boolean;
-    procedure ConnectHandler(const ErrorCode: IOErrorCode; const Endpoint: IPEndpoint);
-    procedure ReadHandler(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64);
-    procedure WriteHandler(const ErrorCode: IOErrorCode; const BytesTransferred: UInt64);
+    function ConnectCondition(const Res: OpResult; const Endpoint: IPEndpoint): boolean;
+    procedure ConnectHandler(const Res: OpResult; const Endpoint: IPEndpoint);
+    procedure ReadHandler(const Res: OpResult; const BytesTransferred: UInt64);
+    procedure WriteHandler(const Res: OpResult; const BytesTransferred: UInt64);
 
     procedure ProgressUpdate(const Status: string);
     procedure HandleResponse(const Headers: string; const ResponseData: TBytes);
@@ -78,12 +78,12 @@ end;
 
 { AsyncHttpClientImpl }
 
-function AsyncHttpCliImpl.ConnectCondition(const ErrorCode: IOErrorCode;
+function AsyncHttpCliImpl.ConnectCondition(const Res: OpResult;
   const Endpoint: IPEndpoint): boolean;
 begin
-  if (ErrorCode) then
+  if (not Res.Success) then
   begin
-    ProgressUpdate('Connection attempt failed: ' + ErrorCode.Message);
+    ProgressUpdate('Connection attempt failed: ' + Res.Message);
   end;
 
   ProgressUpdate('Connecting to ' + Endpoint);
@@ -92,15 +92,15 @@ begin
   result := True;
 end;
 
-procedure AsyncHttpCliImpl.ConnectHandler(const ErrorCode: IOErrorCode;
+procedure AsyncHttpCliImpl.ConnectHandler(const Res: OpResult;
   const Endpoint: IPEndpoint);
 var
   request: string;
   requestData: TBytes;
 begin
-  if (ErrorCode) then
+  if (not Res.Success) then
   begin
-    ProgressUpdate('Connection attempt failed: ' + ErrorCode.Message);
+    ProgressUpdate('Connection attempt failed: ' + Res.Message);
     ProgressUpdate('Unable to connect to host');
     Service.Stop; // TODO - better stopping
     exit;
@@ -255,15 +255,15 @@ begin
     FProgressHandler(Status);
 end;
 
-procedure AsyncHttpCliImpl.ReadHandler(const ErrorCode: IOErrorCode;
+procedure AsyncHttpCliImpl.ReadHandler(const Res: OpResult;
   const BytesTransferred: UInt64);
 var
   headers: string;
   responseData: TBytes;
   reader: StreamReader;
 begin
-  if (ErrorCode) then
-    RaiseLastOSError(ErrorCode.Value);
+  if (not Res.Success) then
+    RaiseLastOSError(Res.Value);
 
   FSocket.Close();
 
@@ -287,11 +287,11 @@ begin
   FProgressHandler := Value;
 end;
 
-procedure AsyncHttpCliImpl.WriteHandler(const ErrorCode: IOErrorCode;
+procedure AsyncHttpCliImpl.WriteHandler(const Res: OpResult;
   const BytesTransferred: UInt64);
 begin
-  if (ErrorCode) then
-    RaiseLastOSError(ErrorCode.Value);
+  if (not Res.Success) then
+    RaiseLastOSError(Res.Value);
 
   // half close
   FSocket.Shutdown(SocketShutdownWrite);
