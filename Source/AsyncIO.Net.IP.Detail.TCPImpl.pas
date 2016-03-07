@@ -395,7 +395,7 @@ begin
       // assign the peer socket handle
       IPSocketAssign(Peer, peerProtocol, peerSocket);
 
-      if (not r.Success) then
+      if (r.Success) then
       begin
         // update socket options, need to associate the listen socket with the accept socket
         // AcceptEx requires this for getsockname/getpeername
