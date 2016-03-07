@@ -365,6 +365,7 @@ function NewTCPAcceptor(const Service: IOService): IPAcceptor; overload;
 // open acceptor on the given endpoint
 function NewTCPAcceptor(const Service: IOService; const LocalEndpoint: IPEndpoint): IPAcceptor; overload;
 
+procedure AsyncAccept(const Acceptor: IPAcceptor; const Peer: IPSocket; Handler: OpHandler); overload;
 
 type
   AsyncSocketStream = interface(AsyncStream)
@@ -1426,6 +1427,11 @@ begin
   result := NewTCPAcceptor(Service);
   result.Bind(LocalEndpoint);
   result.Listen();
+end;
+
+procedure AsyncAccept(const Acceptor: IPAcceptor; const Peer: IPSocket; Handler: OpHandler); overload;
+begin
+  Acceptor.AsyncAccept(Peer, Handler);
 end;
 
 procedure AsyncConnect(const Socket: IPSocket; const Endpoints: IPResolver.Results; const Handler: ConnectHandler);
